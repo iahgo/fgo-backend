@@ -1,0 +1,103 @@
+name: Build e Deploy MS Operação
+
+# =================================================================
+# O que este workflow FAZ:
+#   1. Compila o JAR
+#   2. Constrói a imagem Docker e faz push para o GHCR (privado)
+#   3. Faz rolling update do Deployment no OpenShift com a nova imagem
+#   4. Aguarda todos os pods ficarem saudáveis
+#
+# O que este workflow NÃO FAZ:
+#   - Não cria nem atualiza Secrets — feito uma única vez pelo bootstrap.sh
+#   - Não passa nenhuma credencial de negócio (DB2, Redis) pelo CI/CD
+#   - Não commita nenhuma informação sensível
+#
+# SECRETS NECESSÁRIOS (apenas para autenticação do CI/CD):
+#   OPENSHIFT_SERVER — URL da API: https://api.crc.testing:6443
+#   OPENSHIFT_TOKEN  — token da service account github-deployer
+#                      (gerado pelo bootstrap.sh — nunca expira nos logs)
+#
+# PRÉ-REQUISITO: Self-hosted runner no Mac
+#   (veja INSTALACAO-MICROSHIFT.md passo 8)
+# =================================================================
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-e-deploy:
+    name: Build → GHCR → OpenShift
+    runs-on: self-hosted
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configura Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Compila com Maven
+        run: mvn package -DskipTests -q
+
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build e Push da imagem
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/fgo-backend:latest
+            ghcr.io/${{ github.repository_owner }}/fgo-backend:${{ github.sha }}
+
+      - name: Login no OpenShift
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: ${{ secrets.OPENSHIFT_SERVER }}
+          openshift_token: ${{ secrets.OPENSHIFT_TOKEN }}
+          insecure_skip_tls_verify: true
+
+      # Aplica apenas os manifestos sem dados sensíveis
+      # Secrets e ConfigMaps com credenciais já existem no OpenShift
+      # criados pelo bootstrap.sh — não são tocados aqui
+      - name: Aplicar manifestos
+        run: |
+          oc apply -f openshift/01-namespace.yaml
+          oc apply -f openshift/03-configmap.yaml
+          oc apply -f openshift/05-service.yaml
+          oc apply -f openshift/06-route.yaml
+          oc apply -f openshift/07-hpa.yaml
+
+      - name: Deploy nova imagem (rolling update)
+        run: |
+          IMAGE="ghcr.io/${{ github.repository_owner }}/fgo-backend:${{ github.sha }}"
+
+          sed "s|ghcr.io/GITHUB_USER/fgo-backend:latest|$IMAGE|g" \
+            openshift/04-deployment.yaml | oc apply -f -
+
+          oc rollout restart deployment/ms-operacao -n fgo-backend
+
+      - name: Aguardar rollout completo
+        run: oc rollout status deployment/ms-operacao -n fgo-backend --timeout=300s
+
+      - name: Status final
+        run: |
+          oc get pods -n fgo-backend
+          oc get route ms-operacao -n fgo-backend -o jsonpath='{.spec.host}'

@@ -1,0 +1,33 @@
+# Horizontal Pod Autoscaler
+# Escala entre 3 e 10 pods conforme uso de CPU
+# No home server com 1 nó, o limite real é a RAM disponível
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ms-operacao
+  namespace: fgo-backend
+  labels:
+    app.kubernetes.io/name: ms-operacao
+    app.kubernetes.io/part-of: fgo
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ms-operacao
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          # Escala se CPU > 70% em média entre os pods
+          averageUtilization: 70
+  behavior:
+    scaleDown:
+      # Aguarda 5 minutos de CPU baixa antes de reduzir pods
+      # Evita oscilações no momento do warm-up diário
+      stabilizationWindowSeconds: 300
+    scaleUp:
+      stabilizationWindowSeconds: 60

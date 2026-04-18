@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ms-operacao-config
+  namespace: fgo-backend
+  labels:
+    app.kubernetes.io/name: ms-operacao
+    app.kubernetes.io/part-of: fgo
+data:
+  # Configurações não-sensíveis — valores sensíveis ficam no Secret
+  QUARKUS_LOG_LEVEL: "INFO"
+  QUARKUS_LOG_CATEGORY_COM_EXAMPLE_LEVEL: "DEBUG"
+  # DB2_PORT e DB2_DATABASE também ficam aqui por não serem sensíveis
+  # mas colocamos no Secret para centralizar tudo em 1 lugar

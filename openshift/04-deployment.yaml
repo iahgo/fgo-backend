@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms-operacao
+  namespace: fgo-backend
+  labels:
+    app.kubernetes.io/name: ms-operacao
+    app.kubernetes.io/version: latest
+    app.kubernetes.io/part-of: fgo
+    app.kubernetes.io/component: backend
+  annotations:
+    # Atualizado automaticamente pelo CI/CD com o SHA do commit
+    deployment.kubernetes.io/revision: "1"
+spec:
+  # Mínimo de 3 pods — o HPA pode escalar até 10
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ms-operacao
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # Durante deploy: no máximo 1 pod fora de serviço (2 de 3 sempre up)
+      maxUnavailable: 1
+      # Sobe 1 novo pod antes de derrubar o antigo
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: ms-operacao
+        app.kubernetes.io/name: ms-operacao
+        app.kubernetes.io/part-of: fgo
+    spec:
+      # Necessário para pulls do GHCR (registry privado)
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+
+      # Garante que pods fiquem em nós diferentes (anti-affinity suave)
+      # No home server com 1 nó MicroShift, 3 pods ficam no mesmo nó — é esperado
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values: [ms-operacao]
+                topologyKey: kubernetes.io/hostname
+
+      containers:
+        - name: ms-operacao
+          # A tag :latest é substituída pelo CI/CD com o SHA do commit
+          image: ghcr.io/GITHUB_USER/fgo-backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+
+          # Todas as configs vêm do Secret — nenhuma variável sensível no YAML
+          envFrom:
+            - secretRef:
+                name: ms-operacao-secrets
+
+          # Liveness: se falhar, o container é reiniciado
+          # Verifica que o processo não travou (Redis liveness check interno)
+          livenessProbe:
+            httpGet:
+              path: /q/health/live
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
+            timeoutSeconds: 5
+
+          # Readiness: se falhar, o pod sai do load balancer
+          # Verifica DB2 conectividade (SELECT 1 FROM SYSIBM.SYSDUMMY1)
+          readinessProbe:
+            httpGet:
+              path: /q/health/ready
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 5
+
+          resources:
+            requests:
+              # Garantido ao pod — ajuste conforme a memória real do servidor
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              # Limite máximo — JVM Quarkus com 50 agentes carregados
+              cpu: "500m"
+              memory: "768Mi"
+
+      # Encerra graciosamente — espera requisições em andamento terminarem
+      terminationGracePeriodSeconds: 30

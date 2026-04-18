@@ -1,0 +1,28 @@
+# Route é exclusivo do OpenShift (equivalente ao Ingress do Kubernetes puro)
+# Expõe o serviço externamente via hostname configurado no MicroShift
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: ms-operacao
+  namespace: fgo-backend
+  labels:
+    app.kubernetes.io/name: ms-operacao
+    app.kubernetes.io/part-of: fgo
+spec:
+  # Em MicroShift, o hostname padrão é: <nome>.<namespace>.<domínio-configurado>
+  # Ex: ms-operacao.fgo-backend.apps.centos-home.local
+  # Deixe em branco para que o OpenShift gere automaticamente
+  # host: ms-operacao.fgo-backend.apps.SEU-DOMINIO
+
+  to:
+    kind: Service
+    name: ms-operacao
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    # edge: TLS termina no router OpenShift, tráfego interno é HTTP
+    termination: edge
+    # Se não tiver certificado, use Allow para redirecionar HTTP → HTTPS
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
