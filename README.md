@@ -7,16 +7,19 @@ Desenvolvido em **Quarkus 3.8.4 + Redis Sentinel + IBM DB2**, rodando em **OpenS
 
 ## 🔗 Links de acesso público (internet)
 
-> Expostos via **Cloudflare Tunnel** — sem VPN, sem Tailscale, direto do navegador.  
-> Configure com `scripts/setup-cloudflare-tunnel.sh SEU-DOMINIO.com`
+> Expostos via **ngrok** — sem VPN, sem domínio, sem Tailscale.  
+> Conta gratuita em [dashboard.ngrok.com](https://dashboard.ngrok.com/signup) dá 1 domínio estático fixo.  
+> Configure com: `bash scripts/setup-ngrok.sh <AUTHTOKEN> <STATIC-DOMAIN>`
 
 | Recurso | URL pública |
 |---|---|
-| **Swagger UI** | `https://swagger.SEU-DOMINIO.com/q/swagger-ui` |
-| **Console OpenShift** | `https://openshift.SEU-DOMINIO.com` |
-| **Health** | `https://api.SEU-DOMINIO.com/q/health` |
-| **Métricas do sistema** | `https://api.SEU-DOMINIO.com/admin/sistema` |
-| **Logs do pod** | `https://api.SEU-DOMINIO.com/admin/logs` |
+| **Swagger UI** | `https://<STATIC-DOMAIN>/q/swagger-ui` |
+| **Health** | `https://<STATIC-DOMAIN>/q/health` |
+| **Métricas do sistema** | `https://<STATIC-DOMAIN>/admin/sistema` |
+| **Logs do pod** | `https://<STATIC-DOMAIN>/admin/logs` |
+| **Dashboard ngrok** | `http://SERVIDOR:4040` (inspeciona req em tempo real) |
+
+> O console OpenShift requer 2 domínios (plano pago). Use `oc` CLI com o usuário `fgo-viewer`.
 
 ### Usuários do OpenShift
 
