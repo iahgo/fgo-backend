@@ -7,23 +7,20 @@ Desenvolvido em **Quarkus 3.8.4 + Redis Sentinel + IBM DB2**, rodando em **OpenS
 
 ## 🔗 Links de acesso público (internet)
 
-> Expostos via **ngrok** — sem VPN, sem domínio, sem Tailscale.  
-> Conta gratuita em [dashboard.ngrok.com](https://dashboard.ngrok.com/signup) dá 1 domínio estático fixo.  
-> Configure com: `bash scripts/setup-ngrok.sh <AUTHTOKEN> <STATIC-DOMAIN>`
+> Expostos via **Tailscale Funnel** — URL fixa `*.ts.net`, sem VPN, sem domínio, sem configuração de roteador.  
+> Funciona para qualquer pessoa na internet.
 
 | Recurso | URL pública |
 |---|---|
-| **Swagger UI** | `https://<STATIC-DOMAIN>/q/swagger-ui` |
-| **Health** | `https://<STATIC-DOMAIN>/q/health` |
-| **Métricas do sistema** | `https://<STATIC-DOMAIN>/admin/sistema` |
-| **Logs do pod** | `https://<STATIC-DOMAIN>/admin/logs` |
-| **Dashboard ngrok** | `http://SERVIDOR:4040` (inspeciona req em tempo real) |
-
-> O console OpenShift requer 2 domínios (plano pago). Use `oc` CLI com o usuário `fgo-viewer`.
+| **Swagger UI** | https://localhost-1.tail061a64.ts.net/q/swagger-ui |
+| **Health** | https://localhost-1.tail061a64.ts.net/q/health |
+| **Métricas do sistema** | https://localhost-1.tail061a64.ts.net/admin/sistema |
+| **Logs do pod** | https://localhost-1.tail061a64.ts.net/admin/logs |
+| **Console OpenShift** | https://localhost-1.tail061a64.ts.net/console |
 
 ### Usuários do OpenShift
 
-> Crie com `scripts/setup-openshift-users.sh` no servidor.
+Login no Console: acesse a URL acima → selecione **fgo-htpasswd** → entre com usuário e senha abaixo.
 
 | Usuário | Senha | Nível de acesso |
 |---|---|---|
@@ -32,7 +29,13 @@ Desenvolvido em **Quarkus 3.8.4 + Redis Sentinel + IBM DB2**, rodando em **OpenS
 | `fgo-viewer` | `FgoView2026!` | View em `fgo-backend` — somente leitura |
 | `log-viewer` | `FgoLog2026!` | View em `fgo-backend` — somente leitura |
 
-Login: selecione **fgo-htpasswd** no console e entre com usuário + senha acima.
+Login via CLI:
+```bash
+oc login --server=https://api.crc.testing:6443 -u fgo-viewer -p 'FgoView2026!'
+```
+
+> Para reconfigurar o tunnel: `sudo bash scripts/setup-tailscale-funnel.sh`  
+> Para recriar os usuários: `bash scripts/setup-openshift-users.sh`
 
 ---
 
