@@ -164,7 +164,7 @@ jobs:
 
       - name: Aguardar rollout completo
         run: |
-          oc rollout status deployment/ms-operacao -n fgo-backend --timeout=300s
+          oc rollout status deployment/ms-operacao -n fgo-backend --timeout=900s
           echo "- ✅ Rollout concluído" >> $GITHUB_STEP_SUMMARY
 
       - name: Smoke test — /q/health
