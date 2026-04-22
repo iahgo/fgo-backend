@@ -40,7 +40,9 @@ public class OperacaoMapper {
                 domain.getTotalAtivas(),
                 domain.getVlrCarteira(),
                 domain.getTotalInad(),
-                taxaInad
+                taxaInad,
+                domain.getVlrAtraso(),
+                domain.getVlrGarantia()
         );
     }
 

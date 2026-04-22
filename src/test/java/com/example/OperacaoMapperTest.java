@@ -16,13 +16,19 @@ class OperacaoMapperTest {
 
     private final OperacaoMapper mapper = new OperacaoMapper();
 
+    // -----------------------------------------------------------------------
+    // toKpiDto — campo a campo
+    // -----------------------------------------------------------------------
+
     @Test
     void deveMapearAgregadoParaKpiCorretamente() {
         OperacaoAgregada agregado = new OperacaoAgregada(
                 "FGO Geral",
                 150L,
                 new BigDecimal("5000000.00"),
-                10L
+                10L,
+                new BigDecimal("250000.00"),
+                new BigDecimal("4000000.00")
         );
 
         OperacaoKpiDto dto = mapper.toKpiDto(agregado);
@@ -31,6 +37,25 @@ class OperacaoMapperTest {
         assertEquals(150L, dto.getTotalAtivas());
         assertEquals(new BigDecimal("5000000.00"), dto.getVlrCarteira());
         assertEquals(10L, dto.getTotalInad());
+        assertEquals(new BigDecimal("250000.00"), dto.getVlrAtraso());
+        assertEquals(new BigDecimal("4000000.00"), dto.getVlrGarantia());
+    }
+
+    @Test
+    void deveCalcularTaxaInadimplenciaCorretamente() {
+        OperacaoAgregada agregado = new OperacaoAgregada(
+                "PRONAMPE",
+                200L,
+                new BigDecimal("10000000.00"),
+                20L,
+                new BigDecimal("500000.00"),
+                new BigDecimal("8000000.00")
+        );
+
+        OperacaoKpiDto dto = mapper.toKpiDto(agregado);
+
+        // taxaInad = 20 / 200 = 0.1
+        assertEquals(0.1, dto.getTaxaInad(), 0.000001);
     }
 
     @Test
@@ -39,13 +64,16 @@ class OperacaoMapperTest {
                 "FGO Rural",
                 0L,
                 BigDecimal.ZERO,
-                0L
+                0L,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO
         );
 
         OperacaoKpiDto dto = mapper.toKpiDto(agregado);
 
         assertEquals(0L, dto.getTotalAtivas());
         assertEquals(BigDecimal.ZERO, dto.getVlrCarteira());
+        assertEquals(0.0, dto.getTaxaInad(), 0.000001);
     }
 
     @Test
@@ -54,12 +82,79 @@ class OperacaoMapperTest {
                 null,
                 5L,
                 new BigDecimal("100.00"),
-                0L
+                0L,
+                BigDecimal.ZERO,
+                new BigDecimal("80.00")
         );
 
         OperacaoKpiDto dto = mapper.toKpiDto(agregado);
 
         assertNull(dto.getPrograma());
         assertEquals(5L, dto.getTotalAtivas());
+        assertEquals(new BigDecimal("80.00"), dto.getVlrGarantia());
+    }
+
+    @Test
+    void deveCalcularTaxaInadimplenciaArredondada() {
+        // 1 / 3 = 0.333333...
+        OperacaoAgregada agregado = new OperacaoAgregada(
+                "FGI",
+                3L,
+                new BigDecimal("300.00"),
+                1L,
+                new BigDecimal("50.00"),
+                new BigDecimal("240.00")
+        );
+
+        OperacaoKpiDto dto = mapper.toKpiDto(agregado);
+
+        // Deve arredondar para 6 casas decimais
+        assertEquals(0.333333, dto.getTaxaInad(), 0.000001);
+    }
+
+    @Test
+    void deveMapearTaxaInadQuandoTodosInadimplentes() {
+        OperacaoAgregada agregado = new OperacaoAgregada(
+                "Emergencial Investimento",
+                50L,
+                new BigDecimal("2500000.00"),
+                50L,
+                new BigDecimal("2500000.00"),
+                new BigDecimal("2000000.00")
+        );
+
+        OperacaoKpiDto dto = mapper.toKpiDto(agregado);
+
+        assertEquals(1.0, dto.getTaxaInad(), 0.000001);
+        assertEquals(50L, dto.getTotalInad());
+    }
+
+    // -----------------------------------------------------------------------
+    // toResumoDto — estrutura do DTO completo
+    // -----------------------------------------------------------------------
+
+    @Test
+    void toResumoDtoDevePreencherMetadados() {
+        var dados = java.util.List.of(
+            new OperacaoAgregada("PRONAMPE", 100L, new BigDecimal("1000000.00"), 5L,
+                new BigDecimal("50000.00"), new BigDecimal("800000.00")),
+            new OperacaoAgregada("FGI", 200L, new BigDecimal("2000000.00"), 10L,
+                new BigDecimal("100000.00"), new BigDecimal("1600000.00"))
+        );
+
+        var resumo = mapper.toResumoDto(8, "2026-04", dados);
+
+        assertEquals(8, resumo.getCodAgente());
+        assertEquals("2026-04", resumo.getMesAno());
+        assertEquals(2, resumo.getProgramas().size());
+        assertNotNull(resumo.getCarregadoEm());
+    }
+
+    @Test
+    void toResumoDtoComListaVaziaDeveRetornarSemProgramas() {
+        var resumo = mapper.toResumoDto(3, "2026-04", java.util.List.of());
+
+        assertEquals(3, resumo.getCodAgente());
+        assertTrue(resumo.getProgramas().isEmpty());
     }
 }

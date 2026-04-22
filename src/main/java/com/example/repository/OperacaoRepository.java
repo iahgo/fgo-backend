@@ -1,5 +1,7 @@
 package com.example.repository;
 
+import com.example.domain.AgenteAgregado;
+import com.example.domain.AgenteFinanceiro;
 import com.example.domain.OperacaoAgregada;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -59,7 +61,9 @@ public class OperacaoRepository {
                     p.nmTipPgmCrd,
                     COUNT(o),
                     SUM(o.vlSdoCptlNmld),
-                    SUM(CASE WHEN o.vlSdoCptlAtr > 0 THEN 1 ELSE 0 END)
+                    SUM(CASE WHEN o.vlSdoCptlAtr > 0 THEN 1 ELSE 0 END),
+                    SUM(o.vlSdoCptlAtr),
+                    SUM(o.vlGrtOprAjsd)
                 )
                 FROM OperacaoCreditoFundoGarantidor o, TipoProgramaCredito p
                 WHERE p.cdTipPgmCrd = o.cdTipPgmCrd
@@ -100,5 +104,81 @@ public class OperacaoRepository {
 
         LOG.debugf("[REPOSITORY] %d agentes encontrados", agentes.size());
         return agentes;
+    }
+
+    // =========================================================================
+    // QUERY: TODOS OS AGENTES COM NOME
+    // =========================================================================
+
+    /**
+     * Retorna todos os agentes com código e nome — usado no endpoint GET /api/agentes.
+     */
+    @Transactional(Transactional.TxType.REQUIRED)
+    public List<AgenteFinanceiro> buscarTodosAgentes() {
+        return em.createQuery("""
+                SELECT a FROM AgenteFinanceiro a ORDER BY a.cdAgtFnco
+                """, AgenteFinanceiro.class)
+                .getResultList();
+    }
+
+    // =========================================================================
+    // QUERIES CONSOLIDADAS (todos os agentes) — endpoint admin
+    // =========================================================================
+
+    /**
+     * Agrega operações de TODOS os agentes por programa de crédito para um mês.
+     * Usado no endpoint de visão consolidada (sem filtro por agente).
+     */
+    @Transactional(Transactional.TxType.REQUIRED)
+    public List<OperacaoAgregada> buscarConsolidadoPorPrograma(int ano, int mes) {
+        LOG.debugf("[REPOSITORY] consolidado por programa — ano=%d mes=%d", ano, mes);
+        return em.createQuery("""
+                SELECT NEW com.example.domain.OperacaoAgregada(
+                    p.nmTipPgmCrd,
+                    COUNT(o),
+                    SUM(o.vlSdoCptlNmld),
+                    SUM(CASE WHEN o.vlSdoCptlAtr > 0 THEN 1 ELSE 0 END),
+                    SUM(o.vlSdoCptlAtr),
+                    SUM(o.vlGrtOprAjsd)
+                )
+                FROM OperacaoCreditoFundoGarantidor o, TipoProgramaCredito p
+                WHERE p.cdTipPgmCrd = o.cdTipPgmCrd
+                  AND EXTRACT(YEAR FROM o.dtFrmzOpr) = :ano
+                  AND EXTRACT(MONTH FROM o.dtFrmzOpr) = :mes
+                GROUP BY p.nmTipPgmCrd
+                ORDER BY SUM(o.vlSdoCptlNmld) DESC
+                """, OperacaoAgregada.class)
+                .setParameter("ano", ano)
+                .setParameter("mes", mes)
+                .getResultList();
+    }
+
+    /**
+     * Agrega operações de TODOS os agentes, retornando uma linha por agente.
+     * Usado no endpoint de visão consolidada para ranking de carteira.
+     */
+    @Transactional(Transactional.TxType.REQUIRED)
+    public List<AgenteAgregado> buscarConsolidadoPorAgente(int ano, int mes) {
+        LOG.debugf("[REPOSITORY] consolidado por agente — ano=%d mes=%d", ano, mes);
+        return em.createQuery("""
+                SELECT NEW com.example.domain.AgenteAgregado(
+                    a.cdAgtFnco,
+                    a.nmAbvdAgtFnco,
+                    COUNT(o),
+                    SUM(o.vlSdoCptlNmld),
+                    SUM(CASE WHEN o.vlSdoCptlAtr > 0 THEN 1 ELSE 0 END),
+                    SUM(o.vlSdoCptlAtr),
+                    SUM(o.vlGrtOprAjsd)
+                )
+                FROM OperacaoCreditoFundoGarantidor o, AgenteFinanceiro a
+                WHERE a.cdAgtFnco = o.cdAgtFnco
+                  AND EXTRACT(YEAR FROM o.dtFrmzOpr) = :ano
+                  AND EXTRACT(MONTH FROM o.dtFrmzOpr) = :mes
+                GROUP BY a.cdAgtFnco, a.nmAbvdAgtFnco
+                ORDER BY SUM(o.vlSdoCptlNmld) DESC
+                """, AgenteAgregado.class)
+                .setParameter("ano", ano)
+                .setParameter("mes", mes)
+                .getResultList();
     }
 }

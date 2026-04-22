@@ -24,16 +24,25 @@ public final class OperacaoAgregada {
     private final long totalAtivas;
     private final BigDecimal vlrCarteira;
     private final long totalInad;
+    /** Soma do saldo de capital em atraso (VL_SDO_CPTL_ATR). */
+    private final BigDecimal vlrAtraso;
+    /** Soma do valor de garantia ajustado (VL_GRT_OPR_AJSD). */
+    private final BigDecimal vlrGarantia;
 
-    public OperacaoAgregada(String programa, long totalAtivas, BigDecimal vlrCarteira, long totalInad) {
+    public OperacaoAgregada(String programa, long totalAtivas, BigDecimal vlrCarteira, long totalInad,
+                            BigDecimal vlrAtraso, BigDecimal vlrGarantia) {
         this.programa    = programa;
         this.totalAtivas = totalAtivas;
         this.vlrCarteira = vlrCarteira;
         this.totalInad   = totalInad;
+        this.vlrAtraso   = vlrAtraso;
+        this.vlrGarantia = vlrGarantia;
     }
 
     public String getPrograma()        { return programa; }
     public long getTotalAtivas()       { return totalAtivas; }
     public BigDecimal getVlrCarteira() { return vlrCarteira; }
     public long getTotalInad()         { return totalInad; }
+    public BigDecimal getVlrAtraso()   { return vlrAtraso; }
+    public BigDecimal getVlrGarantia() { return vlrGarantia; }
 }

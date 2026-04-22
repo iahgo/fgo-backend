@@ -33,15 +33,23 @@ public class OperacaoKpiDto {
      */
     private double taxaInad;
 
+    /** Soma do saldo em atraso (VL_SDO_CPTL_ATR). */
+    private BigDecimal vlrAtraso;
+
+    /** Soma da garantia ajustada (VL_GRT_OPR_AJSD). */
+    private BigDecimal vlrGarantia;
+
     public OperacaoKpiDto() {}
 
     public OperacaoKpiDto(String programa, long totalAtivas, BigDecimal vlrCarteira,
-                          long totalInad, double taxaInad) {
+                          long totalInad, double taxaInad, BigDecimal vlrAtraso, BigDecimal vlrGarantia) {
         this.programa    = programa;
         this.totalAtivas = totalAtivas;
         this.vlrCarteira = vlrCarteira;
         this.totalInad   = totalInad;
         this.taxaInad    = taxaInad;
+        this.vlrAtraso   = vlrAtraso;
+        this.vlrGarantia = vlrGarantia;
     }
 
     public String getPrograma()        { return programa; }
@@ -58,4 +66,10 @@ public class OperacaoKpiDto {
 
     public double getTaxaInad()        { return taxaInad; }
     public void setTaxaInad(double v)  { this.taxaInad = v; }
+
+    public BigDecimal getVlrAtraso()          { return vlrAtraso; }
+    public void setVlrAtraso(BigDecimal v)    { this.vlrAtraso = v; }
+
+    public BigDecimal getVlrGarantia()        { return vlrGarantia; }
+    public void setVlrGarantia(BigDecimal v)  { this.vlrGarantia = v; }
 }

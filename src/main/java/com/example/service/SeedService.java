@@ -8,6 +8,7 @@ import org.jboss.logging.Logger;
 import java.math.BigDecimal;
 import java.sql.*;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -86,8 +87,11 @@ public class SeedService {
             statusMsg = "Gerando operações...";
             gerarOperacoes(conn, quantidade);
 
+            statusMsg = "Gerando remessas...";
+            gerarRemessas(conn);
+
             long segundos = (System.currentTimeMillis() - inicio) / 1000;
-            statusMsg = String.format("Concluído: %d registros em %ds", quantidade, segundos);
+            statusMsg = String.format("Concluído: %d operações + remessas em %ds", quantidade, segundos);
             LOG.infof("[SEED] %s", statusMsg);
 
         } catch (Exception e) {
@@ -113,6 +117,8 @@ public class SeedService {
         try (Statement st = conn.createStatement()) {
             st.execute("TRUNCATE TABLE DB2GFG.OPR_CRD_FNDO_GRTR IMMEDIATE");
             LOG.info("[SEED] OPR_CRD_FNDO_GRTR truncada");
+            st.execute("TRUNCATE TABLE DB2GFG.RMS_AGT_FNCO IMMEDIATE");
+            LOG.info("[SEED] RMS_AGT_FNCO truncada");
         } finally {
             conn.setAutoCommit(false);
         }
@@ -284,6 +290,108 @@ public class SeedService {
             conn.rollback();
             throw bue;
         }
+    }
+
+    // =====================================================================
+    // Geração de remessas (RMS_AGT_FNCO)
+    // =====================================================================
+
+    /**
+     * Gera 1 remessa por agente por fundo por dia de 2024-01-01 até hoje.
+     * Total: 7 agentes × 2 fundos × ~843 dias ≈ 11.800 registros.
+     *
+     * Distribuição de status (dias passados — exceto hoje):
+     *   70% Processada (3), 15% Recebida (1), 10% Rejeitada (4), 5% Cancelada (5)
+     * Dia atual: sempre Recebida (chegou hoje, ainda não processou).
+     */
+    private void gerarRemessas(Connection conn) throws SQLException {
+        LOG.info("[SEED] Gerando remessas diárias (RMS_AGT_FNCO)...");
+
+        String sql = """
+            INSERT INTO DB2GFG.RMS_AGT_FNCO (
+              CD_RMS_AGT_FNCO, CD_FNDO_GRTR, CD_AGT_FNCO, NR_SEQL_RMS, NM_DTST,
+              DT_VRS_LAUT, TS_RCT_RMS, DT_PRCT_EVT, DT_CTC_UTZD_PRCT,
+              DT_ATL_MNTR, DT_MVTC_FNCR, CD_MTV_RJC_RMS, VL_LODO_MVTC_RMS,
+              CD_TIP_NTZ_MVTC, CD_TIP_EST_RMS, QT_REG_RMS
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """;
+
+        ThreadLocalRandom rnd = ThreadLocalRandom.current();
+        LocalDate inicio  = LocalDate.of(2024, 1, 1);
+        LocalDate hoje    = LocalDate.now();
+        int id = 1;
+
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            for (int agente : AGENTES) {
+                for (int fundo : FUNDOS) {
+                    short seql = 1;
+                    for (LocalDate dia = inicio; !dia.isAfter(hoje); dia = dia.plusDays(1), seql++) {
+
+                        // Nome do arquivo: AGT{agente}_F{fundo}_{YYYYMMDD}.txt (pad para 44 chars)
+                        String nmDtst = String.format("%-44s",
+                            String.format("AGT%03d_F%d_%s.txt",
+                                agente, fundo,
+                                dia.toString().replace("-", "")))
+                            .substring(0, 44);
+
+                        // Chegada: 07h–09h do dia de referência
+                        LocalDateTime tsRct = dia.atTime(7 + rnd.nextInt(3), rnd.nextInt(60));
+
+                        // Status: dia atual = Recebida; dias anteriores com distribuição
+                        short estRms;
+                        if (dia.equals(hoje)) {
+                            estRms = 1; // Recebida (chegou hoje)
+                        } else {
+                            int roll = rnd.nextInt(20);
+                            estRms = roll < 14 ? (short)3   // 70% Processada
+                                   : roll < 17 ? (short)1   // 15% Recebida
+                                   : roll < 19 ? (short)4   // 10% Rejeitada
+                                               : (short)5;  //  5% Cancelada
+                        }
+
+                        LocalDate dtPrct   = (estRms == 3) ? dia.plusDays(1) : null;
+                        LocalDate dtAtl    = dtPrct;
+                        LocalDate dtMvtc   = (dtPrct != null) ? dtPrct.plusDays(rnd.nextInt(2)) : null;
+                        short cdMtvRjc     = (estRms == 4) ? (short)(1 + rnd.nextInt(5)) : (short)0;
+                        int qtdReg         = 10_000 + rnd.nextInt(40_000);
+                        double vlLodo      = Math.round(qtdReg * (50_000 + rnd.nextDouble() * 450_000) * 100.0) / 100.0;
+
+                        int col = 1;
+                        ps.setInt       (col++, id++);
+                        ps.setShort     (col++, (short) fundo);
+                        ps.setInt       (col++, agente);
+                        ps.setShort     (col++, seql);
+                        ps.setString    (col++, nmDtst);
+                        ps.setDate      (col++, Date.valueOf(dia));
+                        ps.setTimestamp (col++, Timestamp.valueOf(tsRct));
+                        if (dtPrct != null) ps.setDate(col++, Date.valueOf(dtPrct));
+                        else ps.setNull (col++, Types.DATE);
+                        if (dtPrct != null) ps.setDate(col++, Date.valueOf(dtPrct));
+                        else ps.setNull (col++, Types.DATE);
+                        if (dtAtl != null)  ps.setDate(col++, Date.valueOf(dtAtl));
+                        else ps.setNull (col++, Types.DATE);
+                        if (dtMvtc != null) ps.setDate(col++, Date.valueOf(dtMvtc));
+                        else ps.setNull (col++, Types.DATE);
+                        ps.setShort     (col++, cdMtvRjc);
+                        ps.setBigDecimal(col++, BigDecimal.valueOf(vlLodo));
+                        ps.setNull      (col++, Types.SMALLINT);  // CD_TIP_NTZ_MVTC nullable
+                        ps.setShort     (col++, estRms);
+                        ps.setInt       (col++, qtdReg);
+
+                        ps.addBatch();
+
+                        // Commit a cada 1.000 linhas para não estourar o log do DB2
+                        if (id % 1_000 == 0) {
+                            ps.executeBatch();
+                            conn.commit();
+                        }
+                    }
+                }
+            }
+            ps.executeBatch();
+            conn.commit();
+        }
+        LOG.infof("[SEED] %d remessas inseridas (1/agente/fundo/dia desde 2024-01-01).", id - 1);
     }
 
     private void preencherLinha(PreparedStatement ps, long id, ThreadLocalRandom rnd) throws SQLException {

@@ -1,8 +1,10 @@
 package com.example.resource;
 
+import com.example.dto.ConsolidadoDto;
 import com.example.dto.ErroDto;
 import com.example.dto.OperacaoResumoDto;
 import com.example.loader.OperacaoLoader;
+import com.example.service.ConsolidadoService;
 import com.example.service.OperacaoService;
 import jakarta.inject.Inject;
 import jakarta.validation.constraints.Pattern;
@@ -61,6 +63,9 @@ public class OperacaoResource {
 
     @Inject
     OperacaoService service;
+
+    @Inject
+    ConsolidadoService consolidadoService;
 
     @Inject
     OperacaoLoader loader;
@@ -129,6 +134,49 @@ public class OperacaoResource {
         // Exceções de negócio (agente não habilitado, dados ausentes) são lançadas
         // pelo service e tratadas pelo GlobalExceptionMapper — sem try/catch aqui.
         return service.getResumo(codAgente, mesAno);
+    }
+
+    // =====================================================================
+    // ENDPOINT CONSOLIDADO: GET /api/operacoes/{mesAno}/consolidado
+    // =====================================================================
+
+    /**
+     * Visão agregada de TODOS os agentes para o mês.
+     *
+     * Retorna totais gerais + breakdown por programa e por agente.
+     * Consulta o DB2 diretamente — não usa Redis.
+     * Tempo de resposta esperado: 10–60s (query pesada em 100M+ registros).
+     *
+     * Em produção, requer ROLE_GESTOR_FGO.
+     * Em desenvolvimento: curl http://localhost:8080/api/operacoes/2026-04/consolidado
+     */
+    @GET
+    @Path("/{mesAno}/consolidado")
+    @Operation(
+        summary = "Visão consolidada de todos os agentes",
+        description = """
+            Retorna KPIs agregados de todos os agentes financeiros para o mês.
+            Inclui totais gerais, breakdown por programa de crédito e ranking por agente.
+            Consulta o DB2 diretamente — pode demorar até 60s em volumes de produção.
+            Em produção requer ROLE_GESTOR_FGO.
+            """
+    )
+    @APIResponses({
+        @APIResponse(responseCode = "200", description = "Consolidado retornado com sucesso"),
+        @APIResponse(responseCode = "400", description = "Formato de mesAno inválido",
+            content = @Content(schema = @Schema(implementation = ErroDto.class)))
+    })
+    public ConsolidadoDto getConsolidado(
+            @Parameter(
+                description = "Mês de referência no formato YYYY-MM",
+                required = true, example = "2026-04"
+            )
+            @PathParam("mesAno")
+            @Pattern(regexp = "\\d{4}-\\d{2}", message = "Formato inválido. Use YYYY-MM.")
+            String mesAno) {
+
+        LOG.infof("[RESOURCE] GET /api/operacoes/%s/consolidado", mesAno);
+        return consolidadoService.getConsolidado(mesAno);
     }
 
     // =====================================================================
