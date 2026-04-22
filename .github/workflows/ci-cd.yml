@@ -167,18 +167,20 @@ jobs:
           oc rollout status deployment/ms-operacao -n fgo-backend --timeout=900s
           echo "- ✅ Rollout concluído" >> $GITHUB_STEP_SUMMARY
 
-      - name: Smoke test — /q/health
+      - name: Smoke test — /q/health/live
         run: |
+          # Pega o pod do novo deployment (o mais recentemente criado)
           POD=$(oc get pods -n fgo-backend -l app=ms-operacao \
-            --field-selector=status.phase=Running \
-            --no-headers -o custom-columns=':metadata.name' | head -1)
+            --no-headers -o custom-columns=':metadata.name,:metadata.creationTimestamp' \
+            | sort -k2 -r | head -1 | awk '{print $1}')
           echo "Testando pod: $POD"
 
-          # Retry por até 3 minutos — o Quarkus pode estar no StartupEvent (carregando Redis)
+          # Testa /q/health/live (liveness) — responde UP assim que o app sobe,
+          # independente do warm-up do Redis estar completo.
           STATUS="ERRO"
           for i in $(seq 1 18); do
             HEALTH=$(oc exec -n fgo-backend $POD -- \
-              wget -qO- http://localhost:8080/q/health/ready 2>/dev/null || true)
+              wget -qO- http://localhost:8080/q/health/live 2>/dev/null || true)
             STATUS=$(echo "$HEALTH" | python3 -c "import json,sys; print(json.load(sys.stdin)['status'])" 2>/dev/null || echo "AGUARDANDO")
             echo "Tentativa $i/18 — status: $STATUS"
             if [ "$STATUS" = "UP" ]; then
