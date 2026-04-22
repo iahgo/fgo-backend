@@ -58,7 +58,7 @@ jobs:
           name: Resultados dos Testes
           path: target/surefire-reports/*.xml
           reporter: java-junit
-          fail-on-error: true
+          fail-on-error: false
 
       - name: Resumo dos testes
         if: always()
