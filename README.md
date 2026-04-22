@@ -5,20 +5,42 @@ Desenvolvido em **Quarkus 3.8.4 + Redis Sentinel + IBM DB2**, rodando em **OpenS
 
 ---
 
-## 🔗 Links de acesso rápido
+## 🔗 Links de acesso público (internet)
 
-> Para descobrir a URL exata rode: `oc get route ms-operacao -n fgo-backend -o jsonpath='{.spec.host}'`
+> Expostos via **Cloudflare Tunnel** — sem VPN, sem Tailscale, direto do navegador.  
+> Configure com `scripts/setup-cloudflare-tunnel.sh SEU-DOMINIO.com`
+
+| Recurso | URL pública |
+|---|---|
+| **Swagger UI** | `https://swagger.SEU-DOMINIO.com/q/swagger-ui` |
+| **Console OpenShift** | `https://openshift.SEU-DOMINIO.com` |
+| **Health** | `https://api.SEU-DOMINIO.com/q/health` |
+| **Métricas do sistema** | `https://api.SEU-DOMINIO.com/admin/sistema` |
+| **Logs do pod** | `https://api.SEU-DOMINIO.com/admin/logs` |
+
+### Usuários do OpenShift
+
+> Crie com `scripts/setup-openshift-users.sh` no servidor.
+
+| Usuário | Senha | Nível de acesso |
+|---|---|---|
+| `fgo-admin` | `FgoAdmin2026!` | Cluster-admin — acesso total |
+| `fgo-dev` | `FgoDev2026!` | Edit em `fgo-backend` — deploy e logs |
+| `fgo-viewer` | `FgoView2026!` | View em `fgo-backend` — somente leitura |
+| `log-viewer` | `FgoLog2026!` | View em `fgo-backend` — somente leitura |
+
+Login: selecione **fgo-htpasswd** no console e entre com usuário + senha acima.
+
+---
+
+## 🔗 Links internos (rede local / Tailscale)
 
 | Recurso | URL |
 |---|---|
-| **Swagger UI** | `https://<ROUTE_HOST>/q/swagger-ui` |
-| **Health (liveness)** | `https://<ROUTE_HOST>/q/health/live` |
-| **Health (readiness)** | `https://<ROUTE_HOST>/q/health/ready` |
-| **Métricas do sistema** | `https://<ROUTE_HOST>/admin/sistema` |
-| **Logs do pod** | `https://<ROUTE_HOST>/admin/logs` |
-| **Console OpenShift** | `https://console-openshift-console.apps-crc.testing` |
+| **Swagger UI (local)** | `https://ms-operacao-fgo-backend.apps-crc.testing/q/swagger-ui` |
+| **Console OpenShift (local)** | `https://console-openshift-console.apps-crc.testing` |
 
-> **Nota:** O domínio `apps-crc.testing` é local ao servidor. Para acesso externo é necessário Tailscale ou tunel configurado.
+> URL exata: `oc get route ms-operacao -n fgo-backend -o jsonpath='{.spec.host}'`
 
 ---
 
