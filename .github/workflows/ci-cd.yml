@@ -5,15 +5,16 @@ name: CI/CD — MS Operação FGO
 #
 #   1. Testes unitários  → relatório visual no Actions
 #   2. Compilar JAR
-#   3. Build imagem Docker (linux/amd64)
-#   4. Push para registry interno do OpenShift via Tailscale
-#   5. Rolling update (zero downtime — pod antigo só morre quando o novo está healthy)
+#   3. Build imagem com Podman (runner no servidor RHEL)
+#   4. Push para registry interno do OpenShift (localhost)
+#   5. Rolling update (zero downtime)
 #   6. Smoke test no /q/health
 #   7. Resumo visual no GitHub Actions Summary
 #
 # SECRETS NECESSÁRIOS (Settings → Secrets → Actions):
-#   OPENSHIFT_SERVER  = https://100.122.139.76:7443
-#   OPENSHIFT_TOKEN   = token da SA github-deployer (gerado pelo bootstrap)
+#   OPENSHIFT_TOKEN = token da SA github-deployer (gerado pelo bootstrap)
+#
+# Runner: self-hosted no servidor RHEL (não depende do Mac estar ligado)
 # =================================================================
 
 on:
@@ -113,16 +114,17 @@ jobs:
 
       - name: Login no OpenShift
         run: |
+          # Runner está no servidor — acessa o CRC diretamente via localhost
           oc login \
-            --server=${{ secrets.OPENSHIFT_SERVER }} \
+            --server=https://localhost:6443 \
             --token=${{ secrets.OPENSHIFT_TOKEN }} \
             --insecure-skip-tls-verify=true
           echo "- ✅ Login OpenShift: $(oc whoami)" >> $GITHUB_STEP_SUMMARY
 
-      - name: Build da imagem Docker
+      - name: Build da imagem com Podman
         run: |
-          docker build \
-            --platform linux/amd64 \
+          # Servidor usa Podman (RHEL) — mesma CLI do Docker
+          podman build \
             -t ms-operacao:${{ github.sha }} \
             -t ms-operacao:latest \
             .
@@ -132,13 +134,17 @@ jobs:
         run: |
           REGISTRY=default-route-openshift-image-registry.apps-crc.testing
           TOKEN=$(oc whoami -t)
-          echo "$TOKEN" | docker login --username kubeadmin --password-stdin $REGISTRY
+          podman login \
+            --tls-verify=false \
+            --username kubeadmin \
+            --password "$TOKEN" \
+            $REGISTRY
 
-          docker tag ms-operacao:${{ github.sha }} $REGISTRY/fgo-backend/ms-operacao:${{ github.sha }}
-          docker tag ms-operacao:${{ github.sha }} $REGISTRY/fgo-backend/ms-operacao:latest
+          podman tag ms-operacao:${{ github.sha }} $REGISTRY/fgo-backend/ms-operacao:${{ github.sha }}
+          podman tag ms-operacao:${{ github.sha }} $REGISTRY/fgo-backend/ms-operacao:latest
 
-          docker push $REGISTRY/fgo-backend/ms-operacao:${{ github.sha }}
-          docker push $REGISTRY/fgo-backend/ms-operacao:latest
+          podman push --tls-verify=false $REGISTRY/fgo-backend/ms-operacao:${{ github.sha }}
+          podman push --tls-verify=false $REGISTRY/fgo-backend/ms-operacao:latest
           echo "- ✅ Push concluído: \`$REGISTRY/fgo-backend/ms-operacao:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
 
       - name: Aplicar manifestos
