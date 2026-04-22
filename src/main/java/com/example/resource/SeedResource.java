@@ -80,6 +80,35 @@ public class SeedResource {
     }
 
     /**
+     * Popula apenas a tabela RMS_AGT_FNCO com remessas diárias (2024-01-01 até hoje).
+     * NÃO apaga nem toca nas operações (OPR_CRD_FNDO_GRTR).
+     * Seguro de usar mesmo com 100M de operações já inseridas.
+     */
+    @POST
+    @Path("/remessas")
+    public Response gerarRemessas() {
+        if (seedService.isEmExecucao()) {
+            return Response.status(Response.Status.CONFLICT)
+                    .entity(Map.of("erro", "Geração já em andamento", "status", seedService.getStatusMsg()))
+                    .build();
+        }
+
+        LOG.info("[SEED] Iniciando seed de remessas (sem apagar operações).");
+        executor.submit(() -> {
+            try {
+                seedService.gerarSomenteRemessas();
+            } catch (Exception e) {
+                LOG.errorf(e, "[SEED] Falha ao gerar remessas");
+            }
+        });
+
+        return Response.accepted(Map.of(
+                "mensagem",  "Geração de remessas iniciada em background (~11.800 registros)",
+                "statusUrl", "/admin/seed/status"
+        )).build();
+    }
+
+    /**
      * Retorna o progresso atual da geração de dados.
      */
     @GET

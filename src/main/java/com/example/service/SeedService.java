@@ -63,6 +63,46 @@ public class SeedService {
     public long    getTotal()      { return total; }
     public String  getStatusMsg()  { return statusMsg; }
 
+    /**
+     * Popula apenas a RMS_AGT_FNCO — sem tocar em OPR_CRD_FNDO_GRTR nem nos dados mestres.
+     * Seguro de chamar mesmo com 100M de operações já inseridas.
+     */
+    public void gerarSomenteRemessas() {
+        if (emExecucao) {
+            LOG.warn("[SEED] Geração já em andamento. Ignorando.");
+            return;
+        }
+        emExecucao = true;
+        statusMsg = "Gerando remessas...";
+        long inicio = System.currentTimeMillis();
+
+        try (Connection conn = dataSource.getConnection()) {
+            conn.setAutoCommit(false);
+
+            // Limpa apenas remessas, preserva operações
+            conn.commit();
+            conn.setAutoCommit(true);
+            try (Statement st = conn.createStatement()) {
+                st.execute("TRUNCATE TABLE DB2GFG.RMS_AGT_FNCO IMMEDIATE");
+                LOG.info("[SEED] RMS_AGT_FNCO truncada");
+            } finally {
+                conn.setAutoCommit(false);
+            }
+
+            gerarRemessas(conn);
+
+            long segundos = (System.currentTimeMillis() - inicio) / 1000;
+            statusMsg = String.format("Remessas concluídas em %ds", segundos);
+            LOG.infof("[SEED] %s", statusMsg);
+
+        } catch (Exception e) {
+            statusMsg = "ERRO remessas: " + e.getMessage();
+            LOG.errorf("[SEED] Falha ao gerar remessas: %s", e.getMessage(), e);
+        } finally {
+            emExecucao = false;
+        }
+    }
+
     public void gerarDados(long quantidade, boolean limpar) {
         if (emExecucao) {
             LOG.warn("[SEED] Geração já em andamento. Ignorando.");
