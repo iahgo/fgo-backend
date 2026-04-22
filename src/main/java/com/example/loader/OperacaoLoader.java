@@ -10,6 +10,7 @@ import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.context.ManagedExecutor;
 import org.jboss.logging.Logger;
 
 import java.time.YearMonth;
@@ -42,6 +43,7 @@ public class OperacaoLoader {
     @Inject OperacaoRepository db2Repository;
     @Inject OperacaoRedisRepository redisRepository;
     @Inject OperacaoMapper mapper;
+    @Inject ManagedExecutor executor;
 
     // =========================================================================
     // MECANISMO 1: WARM-UP DIÁRIO
@@ -58,37 +60,19 @@ public class OperacaoLoader {
     // =========================================================================
 
     void onStart(@Observes StartupEvent event) {
-        LOG.info("=== [STARTUP] Verificando Redis antes de aceitar tráfego ===");
-
-        List<Integer> agentes = agentesAtivos();
-        if (agentes.isEmpty()) {
-            LOG.warn("[STARTUP] Nenhum agente ativo encontrado no DB2. Pod sobe sem dados no Redis.");
-            return;
-        }
-
-        String mesAno = mesAtual();
-        List<Integer> semDados = new ArrayList<>();
-
-        for (int codAgente : agentes) {
-            if (!redisRepository.existe(codAgente, mesAno)) {
-                semDados.add(codAgente);
-            }
-        }
-
-        if (semDados.isEmpty()) {
-            LOG.infof("[STARTUP] Redis OK. %d agentes com dados. Pod pronto.", agentes.size());
-            return;
-        }
-
-        LOG.warnf("[STARTUP] %d agente(s) sem dados. Carregando do DB2...", semDados.size());
-        for (int codAgente : semDados) {
+        // Dispara o warm-up em background para não bloquear a readiness probe.
+        // Com 100M+ registros a query de agregação demora vários minutos —
+        // bloquear o StartupEvent impede o pod de responder /q/health/ready
+        // e o OpenShift entra em CrashLoopBackOff.
+        // O CacheGuardian (a cada 10min) garante que o Redis seja preenchido.
+        LOG.info("=== [STARTUP] Disparando warm-up em background — pod já responde tráfego ===");
+        executor.submit(() -> {
             try {
-                carregarAgente(codAgente, mesAno);
+                carregarTodosComRetry("startup-bg");
             } catch (Exception e) {
-                LOG.errorf("[STARTUP] Falha no agente %d: %s — CacheGuardian corrige em 10min.", codAgente, e.getMessage());
+                LOG.errorf("[STARTUP] Erro no warm-up em background: %s", e.getMessage());
             }
-        }
-        LOG.info("[STARTUP] Concluído. Pod pronto para tráfego.");
+        });
     }
 
     // =========================================================================
