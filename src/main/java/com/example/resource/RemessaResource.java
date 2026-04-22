@@ -71,7 +71,7 @@ public class RemessaResource {
         }
 
         int limiteSeguro = Math.min(Math.max(limite, 1), 200);
-        LOG.debugf("[REMESSA] GET /api/remessas | agente=%d | limite=%d", codAgente, limiteSeguro);
+        LOG.debugf("[REMESSA] GET /api/remessas | agente=%d | limite=%d", (Object) codAgente, limiteSeguro);
         return service.listarPorAgente(codAgente, limiteSeguro);
     }
 
@@ -106,7 +106,7 @@ public class RemessaResource {
             );
         }
 
-        LOG.debugf("[REMESSA] GET /api/remessas/%d | agente=%d", id, codAgente);
+        LOG.debugf("[REMESSA] GET /api/remessas/%d | agente=%d", (Object) id, codAgente);
         return service.buscarPorId(id, codAgente)
                 .orElseThrow(() -> new WebApplicationException(
                     Response.status(Response.Status.NOT_FOUND)
