@@ -25,7 +25,7 @@
 # ESTÁGIO 1: Build com Maven
 # O GitHub Actions usa este estágio para compilar o JAR.
 # -----------------------------------------------------------------
-FROM maven:3.9-eclipse-temurin-17-alpine AS build
+FROM docker.io/library/maven:3.9-eclipse-temurin-17-alpine AS build
 
 WORKDIR /app
 
@@ -42,7 +42,7 @@ RUN mvn package -DskipTests -q
 # ESTÁGIO 2: Runtime JVM
 # Imagem final menor — apenas o JRE, sem Maven ou sources.
 # -----------------------------------------------------------------
-FROM eclipse-temurin:17-jre-alpine
+FROM docker.io/library/eclipse-temurin:17-jre-alpine
 
 WORKDIR /app
 
