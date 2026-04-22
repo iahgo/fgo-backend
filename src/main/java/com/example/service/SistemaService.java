@@ -137,7 +137,7 @@ public class SistemaService {
     private RedisDto coletarRedis() {
         RedisDto dto = new RedisDto();
         try {
-            String info = redis.server(String.class).info();
+            String info = redis.server().info();
             Map<String, String> kv = parseRedisInfo(info);
 
             dto.setVersao(kv.getOrDefault("redis_version", "?"));
