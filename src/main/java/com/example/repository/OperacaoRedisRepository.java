@@ -5,7 +5,6 @@ import com.example.dto.OperacaoResumoDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.redis.datasource.RedisDataSource;
 import io.quarkus.redis.datasource.keys.KeyCommands;
-import io.quarkus.redis.datasource.value.SetArgs;
 import io.quarkus.redis.datasource.value.ValueCommands;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -88,12 +87,20 @@ public class OperacaoRedisRepository {
     }
 
     /**
-     * Verifica se existe um resumo para o agente/mês sem carregar o JSON.
-     * Operação O(1) no Redis — usada pelo StartupEvent e CacheGuardian.
+     * Verifica se existe um resumo válido (com ao menos um programa) para o agente/mês.
+     * Um resumo com programas=[] indica que o DB2 estava vazio na carga anterior — deve recarregar.
+     * Usada pelo StartupEvent e CacheGuardian.
      */
     public boolean existe(int codAgente, String mesAno) {
         String chave = chaveResumo(codAgente, mesAno);
-        return redis.key(String.class).exists(chave);
+        String json = redis.value(String.class).get(chave);
+        if (json == null) return false;
+        try {
+            OperacaoResumoDto dto = objectMapper.readValue(json, OperacaoResumoDto.class);
+            return dto.getProgramas() != null && !dto.getProgramas().isEmpty();
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     // =========================================================================
@@ -111,10 +118,13 @@ public class OperacaoRedisRepository {
      */
     public boolean adquirirLock(int codAgente) {
         String chave = chaveLock(codAgente);
-        String resultado = redis.value(String.class)
-                .set(chave, "locked", new SetArgs().nx().ex(config.cache().ttlLock()));
-        boolean adquirido = "OK".equals(resultado);
+        // setnx retorna true se a chave foi criada (lock ganho), false se já existia (lock perdido).
+        // expire logo após define o TTL — a janela entre os dois comandos é aceitável:
+        // se o pod travar após setnx mas antes de expire, o lock fica permanente até reiniciar o Redis.
+        // Em produção com quarkus.scheduler.clustered o lock por agente pode ser revisado.
+        boolean adquirido = redis.value(String.class).setnx(chave, "locked");
         if (adquirido) {
+            redis.key(String.class).expire(chave, config.cache().ttlLock());
             LOG.debugf("[REPOSITORY-REDIS] Lock adquirido | agente=%d", codAgente);
         }
         return adquirido;

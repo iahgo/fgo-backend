@@ -1,40 +1,25 @@
 package com.example.repository;
 
 import com.example.domain.OperacaoAgregada;
-import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.TypedQuery;
+import jakarta.transaction.Transactional;
 import org.jboss.logging.Logger;
 
-import java.math.BigDecimal;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Repositório de acesso ao DB2 para o domínio de Operações.
  *
- * Responsabilidade única: executar queries SQL no DB2 e retornar objetos de domínio.
- * Não conhece Redis, DTOs, regras de negócio ou TTL.
+ * Usa JPA (EntityManager + JPQL) — os campos referenciados nas queries são
+ * os nomes das variáveis Java das entidades, não os nomes de coluna do DB2.
+ * O mapeamento Java → coluna DB2 está concentrado nos @Column de cada entidade.
  *
- * Usa JDBC direto (sem JPA/Hibernate) porque:
- *   - As queries são de AGREGAÇÃO — não mapeamos entidades linha a linha
- *   - JPA geraria overhead de mapeamento desnecessário para resultsets agregados
- *   - Controle total sobre o SQL executado (performance crítica com tabela de 400 GB)
- *
- * =========================================================================
- * IMPORTANTE: AJUSTE OS NOMES DE TABELA E COLUNAS PARA O SEU SCHEMA DB2
- * =========================================================================
- * Antes de usar em produção, adapte:
- *   - TB_OPERACAO         → nome real da sua tabela
- *   - CD_AGENTE           → código do agente
- *   - NM_PROGRAMA         → nome do programa de crédito
- *   - VLR_OPERACAO        → valor da operação
- *   - STATUS              → status da operação
- *   - 'INADIMPLENTE'      → valor de status para inadimplência
- *   - DT_REFERENCIA       → data de referência
+ * Schema: DB2GFG
+ * Entidade principal: OperacaoCreditoFundoGarantidor
+ * Agentes: AgenteFinanceiro
  */
 @ApplicationScoped
 public class OperacaoRepository {
@@ -42,129 +27,78 @@ public class OperacaoRepository {
     private static final Logger LOG = Logger.getLogger(OperacaoRepository.class);
 
     @Inject
-    AgroalDataSource dataSource;
+    EntityManager em;
 
     // =========================================================================
     // QUERY PRINCIPAL: KPIs AGREGADOS POR AGENTE E MÊS
     // =========================================================================
 
     /**
-     * Retorna os KPIs agregados de operações para um agente em um mês específico.
+     * Retorna os KPIs agregados por programa de crédito para um agente em um mês.
      *
-     * A query usa YEAR() e MONTH() do DB2 para filtrar pelo mês de referência.
-     * Alternativa: VARCHAR_FORMAT(DT_REFERENCIA, 'YYYY-MM') = ?
+     * A query usa JPQL com cross-join entre OperacaoCreditoFundoGarantidor e
+     * TipoProgramaCredito, referenciando apenas nomes de variáveis Java.
+     * EXTRACT é padrão JPQL 2.2 — suportado pelo Hibernate 6 (Quarkus 3).
      *
-     * @param codAgente código interno do agente (ex: 8 = Itaú)
-     * @param ano       ano de referência (ex: 2025)
-     * @param mes       mês de referência (ex: 4 para abril)
-     * @return lista de agregados por programa (PRONAMPE, FGI, etc.)
-     * @throws OperacaoRepositoryException em falha de comunicação com o DB2
+     * Agregações:
+     *   - programa      → p.nmTipPgmCrd
+     *   - totalAtivas   → COUNT(o)
+     *   - vlrCarteira   → SUM(o.vlSdoCptlNmld)   (saldo de capital nominal)
+     *   - totalInad     → SUM(CASE WHEN saldo em atraso > 0)
+     *
+     * @param codAgente código do agente (campo cdAgtFnco na entidade)
+     * @param ano       ano de referência
+     * @param mes       mês de referência (1–12)
      */
+    @Transactional(Transactional.TxType.REQUIRED)
     public List<OperacaoAgregada> buscarAgregadoPorAgenteMes(int codAgente, int ano, int mes) {
-        // =====================================================================
-        // AJUSTE ESTE SQL PARA O SEU SCHEMA REAL
-        // =====================================================================
-        final String sql = """
-                SELECT
-                    NM_PROGRAMA,
-                    COUNT(*)                                             AS TOTAL_ATIVAS,
-                    COALESCE(SUM(VLR_OPERACAO), 0)                      AS VLR_CARTEIRA,
-                    COUNT(CASE WHEN STATUS = 'INADIMPLENTE' THEN 1 END) AS TOTAL_INAD
-                FROM TB_OPERACAO
-                WHERE CD_AGENTE         = ?
-                  AND YEAR(DT_REFERENCIA)  = ?
-                  AND MONTH(DT_REFERENCIA) = ?
-                GROUP BY NM_PROGRAMA
-                ORDER BY VLR_CARTEIRA DESC
-                """;
-        // =====================================================================
+        LOG.debugf("[REPOSITORY] agente=%d ano=%d mes=%d — executando agregação JPQL", codAgente, ano, mes);
 
-        LOG.debugf("[REPOSITORY-DB2] agente=%d ano=%d mes=%d — executando query de agregação", codAgente, ano, mes);
+        TypedQuery<OperacaoAgregada> query = em.createQuery("""
+                SELECT NEW com.example.domain.OperacaoAgregada(
+                    p.nmTipPgmCrd,
+                    COUNT(o),
+                    SUM(o.vlSdoCptlNmld),
+                    SUM(CASE WHEN o.vlSdoCptlAtr > 0 THEN 1 ELSE 0 END)
+                )
+                FROM OperacaoCreditoFundoGarantidor o, TipoProgramaCredito p
+                WHERE p.cdTipPgmCrd = o.cdTipPgmCrd
+                  AND o.cdAgtFnco = :codAgente
+                  AND EXTRACT(YEAR FROM o.dtFrmzOpr) = :ano
+                  AND EXTRACT(MONTH FROM o.dtFrmzOpr) = :mes
+                GROUP BY p.nmTipPgmCrd
+                ORDER BY SUM(o.vlSdoCptlNmld) DESC
+                """, OperacaoAgregada.class)
+                .setParameter("codAgente", codAgente)
+                .setParameter("ano", ano)
+                .setParameter("mes", mes);
 
-        List<OperacaoAgregada> resultado = new ArrayList<>();
-
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-
-            ps.setInt(1, codAgente);
-            ps.setInt(2, ano);
-            ps.setInt(3, mes);
-
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    resultado.add(new OperacaoAgregada(
-                            rs.getString("NM_PROGRAMA"),
-                            rs.getLong("TOTAL_ATIVAS"),
-                            rs.getBigDecimal("VLR_CARTEIRA"),
-                            rs.getLong("TOTAL_INAD")
-                    ));
-                }
-            }
-
-        } catch (Exception e) {
-            throw new OperacaoRepositoryException(
-                    String.format("Falha ao consultar DB2 — agente=%d ano=%d mes=%d", codAgente, ano, mes), e);
-        }
-
-        LOG.debugf("[REPOSITORY-DB2] agente=%d — %d programa(s) retornados", codAgente, resultado.size());
+        List<OperacaoAgregada> resultado = query.getResultList();
+        LOG.debugf("[REPOSITORY] agente=%d — %d programa(s) retornados", codAgente, resultado.size());
         return resultado;
     }
 
     // =========================================================================
-    // QUERY AUXILIAR: LISTA DE AGENTES ATIVOS NO DB2
+    // QUERY AUXILIAR: LISTA DE AGENTES ATIVOS
     // =========================================================================
 
     /**
-     * Retorna os códigos de agentes que têm operações ativas no DB2.
+     * Retorna todos os códigos de agentes cadastrados em AgenteFinanceiro.
+     * Todo agente presente na tabela mestre é considerado ativo por definição.
      *
-     * Alternativa ao uso de fgo.agentes.codigos no application.properties.
-     * Use este método quando quiser que a lista de agentes seja dinâmica
-     * (baseada no que existe no banco, não em configuração estática).
-     *
-     * =====================================================================
-     * AJUSTE ESTA QUERY PARA O SEU SCHEMA REAL
-     * =====================================================================
-     *
-     * @throws OperacaoRepositoryException em falha de comunicação com o DB2
+     * A query referencia o campo Java {@code cdAgtFnco} — mapeado para a
+     * coluna DB2 CD_AGT_FNCO via @Column na entidade AgenteFinanceiro.
      */
+    @Transactional(Transactional.TxType.REQUIRED)
     public List<Integer> buscarAgentesAtivos() {
-        final String sql = """
-                SELECT DISTINCT CD_AGENTE
-                FROM TB_OPERACAO
-                WHERE DT_REFERENCIA >= CURRENT_DATE - 30 DAYS
-                ORDER BY CD_AGENTE
-                """;
+        List<Integer> agentes = em.createQuery("""
+                SELECT a.cdAgtFnco
+                FROM AgenteFinanceiro a
+                ORDER BY a.cdAgtFnco
+                """, Integer.class)
+                .getResultList();
 
-        List<Integer> agentes = new ArrayList<>();
-
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-
-            while (rs.next()) {
-                agentes.add(rs.getInt("CD_AGENTE"));
-            }
-
-        } catch (Exception e) {
-            throw new OperacaoRepositoryException("Falha ao buscar agentes ativos no DB2", e);
-        }
-
-        LOG.debugf("[REPOSITORY-DB2] %d agentes ativos encontrados no DB2", agentes.size());
+        LOG.debugf("[REPOSITORY] %d agentes encontrados", agentes.size());
         return agentes;
-    }
-
-    // =========================================================================
-    // EXCEPTION INTERNA DO REPOSITÓRIO
-    // =========================================================================
-
-    /**
-     * Exceção específica do repositório DB2.
-     * Envolve SQLException em uma exceção de runtime sem amarrar as camadas
-     * superiores com checked exceptions de JDBC.
-     */
-    public static class OperacaoRepositoryException extends RuntimeException {
-        public OperacaoRepositoryException(String message, Throwable cause) {
-            super(message, cause);
-        }
     }
 }

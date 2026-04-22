@@ -1,40 +1,40 @@
-name: Build e Deploy MS Operação
+name: CI/CD — MS Operação FGO
 
 # =================================================================
-# O que este workflow FAZ:
-#   1. Compila o JAR
-#   2. Constrói a imagem Docker e faz push para o GHCR (privado)
-#   3. Faz rolling update do Deployment no OpenShift com a nova imagem
-#   4. Aguarda todos os pods ficarem saudáveis
+# FLUXO COMPLETO (a cada push na main):
 #
-# O que este workflow NÃO FAZ:
-#   - Não cria nem atualiza Secrets — feito uma única vez pelo bootstrap.sh
-#   - Não passa nenhuma credencial de negócio (DB2, Redis) pelo CI/CD
-#   - Não commita nenhuma informação sensível
+#   1. Testes unitários  → relatório visual no Actions
+#   2. Compilar JAR
+#   3. Build imagem Docker (linux/amd64)
+#   4. Push para registry interno do OpenShift via Tailscale
+#   5. Rolling update (zero downtime — pod antigo só morre quando o novo está healthy)
+#   6. Smoke test no /q/health
+#   7. Resumo visual no GitHub Actions Summary
 #
-# SECRETS NECESSÁRIOS (apenas para autenticação do CI/CD):
-#   OPENSHIFT_SERVER — URL da API: https://api.crc.testing:6443
-#   OPENSHIFT_TOKEN  — token da service account github-deployer
-#                      (gerado pelo bootstrap.sh — nunca expira nos logs)
-#
-# PRÉ-REQUISITO: Self-hosted runner no Mac
-#   (veja INSTALACAO-MICROSHIFT.md passo 8)
+# SECRETS NECESSÁRIOS (Settings → Secrets → Actions):
+#   OPENSHIFT_SERVER  = https://100.122.139.76:7443
+#   OPENSHIFT_TOKEN   = token da SA github-deployer (gerado pelo bootstrap)
 # =================================================================
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Pular testes (só em emergência)'
+        type: boolean
+        default: false
 
 jobs:
-  build-e-deploy:
-    name: Build → GHCR → OpenShift
-    runs-on: self-hosted
 
-    permissions:
-      contents: read
-      packages: write
+  # ---------------------------------------------------------------
+  # JOB 1 — Testes Unitários
+  # Roda sempre, bloqueia o deploy se falhar
+  # ---------------------------------------------------------------
+  testes:
+    name: Testes Unitários
+    runs-on: self-hosted
 
     steps:
       - name: Checkout
@@ -47,57 +47,147 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Compila com Maven
-        run: mvn package -DskipTests -q
+      - name: Rodar testes
+        if: ${{ !inputs.skip_tests }}
+        run: mvn test --no-transfer-progress
 
-      - name: Login no GHCR
-        uses: docker/login-action@v3
+      - name: Publicar relatório de testes no Actions
+        uses: dorny/test-reporter@v1
+        if: always()
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          name: Resultados dos Testes
+          path: target/surefire-reports/*.xml
+          reporter: java-junit
+          fail-on-error: true
 
-      - name: Build e Push da imagem
-        uses: docker/build-push-action@v5
+      - name: Resumo dos testes
+        if: always()
+        run: |
+          echo "## Testes Unitários" >> $GITHUB_STEP_SUMMARY
+          if [ -d target/surefire-reports ] && ls target/surefire-reports/*.xml 2>/dev/null | head -1 | grep -q xml; then
+            TOTAL=$(grep -roh 'tests="[0-9]*"' target/surefire-reports/*.xml | grep -oh '[0-9]*' | awk '{s+=$1} END {print s+0}')
+            FALHAS=$(grep -roh 'failures="[0-9]*"' target/surefire-reports/*.xml | grep -oh '[0-9]*' | awk '{s+=$1} END {print s+0}')
+            ERROS=$(grep -roh 'errors="[0-9]*"' target/surefire-reports/*.xml | grep -oh '[0-9]*' | awk '{s+=$1} END {print s+0}')
+            IGNORADOS=$(grep -roh 'skipped="[0-9]*"' target/surefire-reports/*.xml | grep -oh '[0-9]*' | awk '{s+=$1} END {print s+0}')
+            echo "| Resultado | Quantidade |" >> $GITHUB_STEP_SUMMARY
+            echo "|-----------|------------|" >> $GITHUB_STEP_SUMMARY
+            echo "| ✅ Passaram | $TOTAL |" >> $GITHUB_STEP_SUMMARY
+            echo "| ❌ Falhas   | $FALHAS |" >> $GITHUB_STEP_SUMMARY
+            echo "| 💥 Erros    | $ERROS |" >> $GITHUB_STEP_SUMMARY
+            echo "| ⏭️ Ignorados| $IGNORADOS |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "> ⚠️ Nenhum teste encontrado em \`src/test/\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ---------------------------------------------------------------
+  # JOB 2 — Build e Deploy
+  # Só roda se testes passarem
+  # ---------------------------------------------------------------
+  deploy:
+    name: Build → Registry → Deploy
+    runs-on: self-hosted
+    needs: testes
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configura Java 17
+        uses: actions/setup-java@v4
         with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/fgo-backend:latest
-            ghcr.io/${{ github.repository_owner }}/fgo-backend:${{ github.sha }}
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Compilar JAR
+        run: |
+          mvn package -DskipTests --no-transfer-progress -q
+          echo "## Deploy" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- 🌿 Branch: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ JAR compilado" >> $GITHUB_STEP_SUMMARY
 
       - name: Login no OpenShift
-        uses: redhat-actions/oc-login@v1
-        with:
-          openshift_server_url: ${{ secrets.OPENSHIFT_SERVER }}
-          openshift_token: ${{ secrets.OPENSHIFT_TOKEN }}
-          insecure_skip_tls_verify: true
+        run: |
+          oc login \
+            --server=${{ secrets.OPENSHIFT_SERVER }} \
+            --token=${{ secrets.OPENSHIFT_TOKEN }} \
+            --insecure-skip-tls-verify=true
+          echo "- ✅ Login OpenShift: $(oc whoami)" >> $GITHUB_STEP_SUMMARY
 
-      # Aplica apenas os manifestos sem dados sensíveis
-      # Secrets e ConfigMaps com credenciais já existem no OpenShift
-      # criados pelo bootstrap.sh — não são tocados aqui
+      - name: Build da imagem Docker
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -t ms-operacao:${{ github.sha }} \
+            -t ms-operacao:latest \
+            .
+          echo "- ✅ Imagem construída: \`ms-operacao:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Push para registry interno do OpenShift
+        run: |
+          REGISTRY=default-route-openshift-image-registry.apps-crc.testing
+          TOKEN=$(oc whoami -t)
+          echo "$TOKEN" | docker login --username kubeadmin --password-stdin $REGISTRY
+
+          docker tag ms-operacao:${{ github.sha }} $REGISTRY/fgo-backend/ms-operacao:${{ github.sha }}
+          docker tag ms-operacao:${{ github.sha }} $REGISTRY/fgo-backend/ms-operacao:latest
+
+          docker push $REGISTRY/fgo-backend/ms-operacao:${{ github.sha }}
+          docker push $REGISTRY/fgo-backend/ms-operacao:latest
+          echo "- ✅ Push concluído: \`$REGISTRY/fgo-backend/ms-operacao:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+
       - name: Aplicar manifestos
         run: |
           oc apply -f openshift/01-namespace.yaml
           oc apply -f openshift/03-configmap.yaml
           oc apply -f openshift/05-service.yaml
           oc apply -f openshift/06-route.yaml
-          oc apply -f openshift/07-hpa.yaml
+          echo "- ✅ Manifestos aplicados" >> $GITHUB_STEP_SUMMARY
 
-      - name: Deploy nova imagem (rolling update)
+      - name: Rolling update — nova versão
         run: |
-          IMAGE="ghcr.io/${{ github.repository_owner }}/fgo-backend:${{ github.sha }}"
-
-          sed "s|ghcr.io/GITHUB_USER/fgo-backend:latest|$IMAGE|g" \
-            openshift/04-deployment.yaml | oc apply -f -
-
-          oc rollout restart deployment/ms-operacao -n fgo-backend
+          IMAGE="image-registry.openshift-image-registry.svc:5000/fgo-backend/ms-operacao:${{ github.sha }}"
+          oc set image deployment/ms-operacao ms-operacao=$IMAGE -n fgo-backend
+          echo "- 🚀 Rolling update iniciado: \`$IMAGE\`" >> $GITHUB_STEP_SUMMARY
+          echo "- ℹ️ Pod antigo só morre quando o novo estiver healthy (zero downtime)" >> $GITHUB_STEP_SUMMARY
 
       - name: Aguardar rollout completo
-        run: oc rollout status deployment/ms-operacao -n fgo-backend --timeout=300s
+        run: |
+          oc rollout status deployment/ms-operacao -n fgo-backend --timeout=300s
+          echo "- ✅ Rollout concluído" >> $GITHUB_STEP_SUMMARY
+
+      - name: Smoke test — /q/health
+        run: |
+          POD=$(oc get pods -n fgo-backend -l app=ms-operacao \
+            --field-selector=status.phase=Running \
+            --no-headers -o custom-columns=':metadata.name' | head -1)
+          echo "Testando pod: $POD"
+
+          HEALTH=$(oc exec -n fgo-backend $POD -- \
+            wget -qO- http://localhost:8080/q/health/ready 2>/dev/null)
+          echo "$HEALTH"
+
+          STATUS=$(echo "$HEALTH" | python3 -c "import json,sys; print(json.load(sys.stdin)['status'])" 2>/dev/null || echo "ERRO")
+          if [ "$STATUS" != "UP" ]; then
+            echo "❌ Health check FALHOU — status: $STATUS"
+            exit 1
+          fi
+
+          echo "## Smoke Test" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ /q/health/ready: **UP**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+          echo "$HEALTH" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
       - name: Status final
+        if: always()
         run: |
-          oc get pods -n fgo-backend
-          oc get route ms-operacao -n fgo-backend -o jsonpath='{.spec.host}'
+          echo "## Pods — fgo-backend" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          oc get pods -n fgo-backend 2>&1 >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          ROTA=$(oc get route ms-operacao -n fgo-backend -o jsonpath='{.spec.host}' 2>/dev/null || echo "não encontrada")
+          echo "## Rota" >> $GITHUB_STEP_SUMMARY
+          echo "- 🌐 https://$ROTA" >> $GITHUB_STEP_SUMMARY

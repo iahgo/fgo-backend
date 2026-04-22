@@ -38,9 +38,17 @@
         </dependency>
 
         <!--
-            DB2 JDBC — driver IBM JCC incluído automaticamente via Maven Central
-            (IBM publicou o driver em 2021: com.ibm.db2:jcc)
-            Provê AgroalDataSource para conexões JDBC diretas sem JPA/Hibernate.
+            Hibernate ORM — JPA com EntityManager + JPQL.
+            Usa o datasource DB2 configurado em application.properties.
+        -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-hibernate-orm</artifactId>
+        </dependency>
+
+        <!--
+            DB2 JDBC — driver IBM JCC (IBM publicou em Maven Central em 2021).
+            Provê o datasource que o Hibernate ORM usa.
             Connection string: jdbc:db2://HOST:50000/BANCO
         -->
         <dependency>
@@ -90,6 +98,16 @@
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-hibernate-validator</artifactId>
+        </dependency>
+
+        <!--
+            MicroProfile Context Propagation — fornece ManagedExecutorService.
+            Usado para disparar recargas em background a partir do endpoint REST
+            e do subscriber Pub/Sub, propagando o contexto CDI para a thread filha.
+        -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-smallrye-context-propagation</artifactId>
         </dependency>
 
         <!-- CDI -->

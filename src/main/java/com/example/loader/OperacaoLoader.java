@@ -118,9 +118,36 @@ public class OperacaoLoader {
     // RELOAD MANUAL
     // =========================================================================
 
+    /**
+     * Recarrega todos os agentes para o mês atual.
+     * Chamado pelo endpoint /admin/reload ou pelo Pub/Sub subscriber
+     * quando o MS Admin publica "operacao" ou "todos" no canal fgo:admin:reload.
+     */
     public void recarregarTudo() {
-        LOG.info("[RELOAD] Recarga manual solicitada.");
+        LOG.info("[RELOAD] Recarga manual solicitada — todos os agentes.");
         carregarTodosComRetry("reload-manual");
+    }
+
+    /**
+     * Recarrega um único agente para o mês atual.
+     * Chamado pelo endpoint /admin/reload/{codAgente} quando o gestor precisa
+     * atualizar apenas um agente específico (ex: reprocessamento pontual às 14h).
+     *
+     * Usa o mesmo lock distribuído SET NX do warm-up normal para evitar
+     * concorrência entre pods em ambientes com múltiplas réplicas.
+     *
+     * @param codAgente código interno do agente a recarregar
+     */
+    public void recarregarAgente(int codAgente) {
+        LOG.infof("[RELOAD] Recarga manual solicitada — agente=%d", codAgente);
+        String mesAno = mesAtual();
+        try {
+            carregarAgente(codAgente, mesAno);
+            LOG.infof("[RELOAD] Agente=%d recarregado com sucesso | mes=%s", codAgente, mesAno);
+        } catch (Exception e) {
+            LOG.errorf("[RELOAD] Falha ao recarregar agente=%d: %s", codAgente, e.getMessage());
+            throw e;
+        }
     }
 
     // =========================================================================

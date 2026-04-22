@@ -6,6 +6,7 @@ import com.example.loader.OperacaoLoader;
 import com.example.service.OperacaoService;
 import jakarta.inject.Inject;
 import jakarta.validation.constraints.Pattern;
+import org.eclipse.microprofile.context.ManagedExecutor;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -63,6 +64,9 @@ public class OperacaoResource {
 
     @Inject
     OperacaoLoader loader;
+
+    @Inject
+    ManagedExecutor executor;
 
     // =====================================================================
     // ENDPOINT PRINCIPAL: GET /api/operacoes/{mesAno}
@@ -128,29 +132,81 @@ public class OperacaoResource {
     }
 
     // =====================================================================
-    // ENDPOINT DE DIAGNÓSTICO: POST /api/operacoes/admin/reload
+    // ENDPOINT DE RELOAD: POST /api/operacoes/admin/reload
     // =====================================================================
 
     /**
-     * Força recarga imediata do Redis para todos os agentes.
+     * Força recarga do Redis para TODOS os agentes do domínio operação.
      *
-     * Em produção, o reload é coordenado pelo MS Administração via Redis Pub/Sub,
-     * protegido por ROLE_GESTOR_FGO no JWT de atendimento do IIB.
+     * Caso de uso: ETL foi reprocessado fora do horário normal (ex: às 14h) e o gestor
+     * precisa que todos os agentes reflitam os dados corrigidos imediatamente.
      *
-     * Em desenvolvimento local (sem IIB), pode ser chamado diretamente:
-     *   curl -X POST http://localhost:8080/api/operacoes/admin/reload
+     * A recarga roda em background — o endpoint retorna 202 imediatamente.
+     * O tempo real de execução (todos os agentes) pode levar vários minutos.
+     *
+     * Em produção este endpoint é acionado indiretamente pelo MS Administração via
+     * Redis Pub/Sub (canal fgo:admin:reload, mensagem "operacao" ou "todos").
+     * O subscriber {@link com.example.listener.OperacaoReloadSubscriber} também
+     * chama o mesmo loader, garantindo comportamento idêntico em ambos os fluxos.
+     *
+     * Protegido por ROLE_GESTOR_FGO no JWT de atendimento do IIB (produção).
+     * Em desenvolvimento local (sem IIB): curl -X POST localhost:8080/api/operacoes/admin/reload
      */
     @POST
     @Path("/admin/reload")
     @Operation(
-        summary = "[DEV] Força recarga do Redis",
-        description = "Dispara o warm-up manualmente. Útil para desenvolvimento e testes. " +
-                      "Em produção, o reload é feito via Redis Pub/Sub pelo MS Administração."
+        summary = "Força recarga do Redis — todos os agentes",
+        description = """
+            Recarrega o cache Redis de todos os agentes financeiros para o domínio operação.
+            Retorna 202 imediatamente. A recarga ocorre em background.
+            Em produção, requer ROLE_GESTOR_FGO no JWT de atendimento do IIB.
+            """
     )
-    @APIResponse(responseCode = "202", description = "Recarga iniciada em background")
-    public Response recarregarCache() {
-        LOG.info("[RESOURCE] Reload manual solicitado via endpoint /admin/reload.");
-        loader.recarregarTudo();
-        return Response.accepted(new ErroDto("RELOAD_INICIADO", "Recarga do cache iniciada.")).build();
+    @APIResponse(responseCode = "202", description = "Recarga iniciada em background — todos os agentes")
+    public Response recarregarTodos() {
+        LOG.info("[RESOURCE] Reload de todos os agentes solicitado via endpoint.");
+        executor.submit(loader::recarregarTudo);
+        return Response.accepted(new ErroDto("RELOAD_INICIADO",
+                "Recarga de todos os agentes iniciada em background.")).build();
+    }
+
+    // =====================================================================
+    // ENDPOINT DE RELOAD: POST /api/operacoes/admin/reload/{codAgente}
+    // =====================================================================
+
+    /**
+     * Força recarga do Redis para UM agente específico.
+     *
+     * Caso de uso: reprocessamento pontual de um único agente às 14h — sem precisar
+     * recarregar os ~40 agentes do domínio inteiro. Execução muito mais rápida.
+     *
+     * A recarga usa o mesmo lock distribuído SET NX do warm-up normal, garantindo
+     * que apenas 1 pod execute o carregamento mesmo em ambientes com múltiplas réplicas.
+     *
+     * Retorna 202 imediatamente. A carga ocorre em background.
+     *
+     * Protegido por ROLE_GESTOR_FGO no JWT de atendimento do IIB (produção).
+     * Em desenvolvimento: curl -X POST localhost:8080/api/operacoes/admin/reload/8
+     */
+    @POST
+    @Path("/admin/reload/{codAgente}")
+    @Operation(
+        summary = "Força recarga do Redis — agente específico",
+        description = """
+            Recarrega o cache Redis de um único agente financeiro.
+            Mais rápido que o reload completo — útil para reprocessamentos pontuais.
+            Retorna 202 imediatamente. A recarga ocorre em background.
+            Em produção, requer ROLE_GESTOR_FGO no JWT de atendimento do IIB.
+            """
+    )
+    @APIResponses({
+        @APIResponse(responseCode = "202", description = "Recarga do agente iniciada em background"),
+        @APIResponse(responseCode = "400", description = "Código de agente inválido")
+    })
+    public Response recarregarAgente(@PathParam("codAgente") int codAgente) {
+        LOG.infof("[RESOURCE] Reload solicitado para agente=%d via endpoint.", codAgente);
+        executor.submit(() -> loader.recarregarAgente(codAgente));
+        return Response.accepted(new ErroDto("RELOAD_INICIADO",
+                "Recarga do agente " + codAgente + " iniciada em background.")).build();
     }
 }
