@@ -35,7 +35,12 @@ public class SeedService {
     // =====================================================================
     // Arrays para geração aleatória
     // =====================================================================
-    private static final int[]    AGENTES    = {1, 2, 3, 4, 5, 6, 7};
+    private static final int[]    AGENTES    = {
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+        11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+        21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+        31, 32, 33, 34, 35, 36, 37, 38, 39, 40
+    };
     private static final int[]    FUNDOS     = {1, 2};
     private static final short[]  PROGRAMAS  = {1, 2, 3, 4, 5, 6};
     private static final short[]  MODALIDS   = {1, 2, 3, 4, 5, 6};
@@ -83,8 +88,8 @@ public class SeedService {
             conn.commit();
             conn.setAutoCommit(true);
             try (Statement st = conn.createStatement()) {
-                st.execute("TRUNCATE TABLE DB2GFG.RMS_AGT_FNCO IMMEDIATE");
-                LOG.info("[SEED] RMS_AGT_FNCO truncada");
+                st.execute("DELETE FROM DB2GFG.RMS_AGT_FNCO");
+                LOG.info("[SEED] RMS_AGT_FNCO limpa");
             } finally {
                 conn.setAutoCommit(false);
             }
@@ -157,8 +162,9 @@ public class SeedService {
         try (Statement st = conn.createStatement()) {
             st.execute("TRUNCATE TABLE DB2GFG.OPR_CRD_FNDO_GRTR IMMEDIATE");
             LOG.info("[SEED] OPR_CRD_FNDO_GRTR truncada");
-            st.execute("TRUNCATE TABLE DB2GFG.RMS_AGT_FNCO IMMEDIATE");
-            LOG.info("[SEED] RMS_AGT_FNCO truncada");
+            st.execute("DELETE FROM DB2GFG.RMS_AGT_FNCO");
+            conn.commit();
+            LOG.info("[SEED] RMS_AGT_FNCO limpa");
         } finally {
             conn.setAutoCommit(false);
         }
@@ -236,29 +242,72 @@ public class SeedService {
             st.execute("INSERT INTO DB2GFG.FNDO_GRTR (CD_FNDO_GRTR, SG_FNDO_GRTR, NM_FNDO_GRTR, NR_AG_CT_MVT_FNDO, NR_CT_MVT_FNDO, CD_CIA_CTB, IDT_ULT_FCHT_BAL, DT_INC_FNDO_GRTR, DT_ECR_FNDO_GRTR, CD_TIP_EST_ENDO, CD_USU_RSP_ATL_REG, CD_USU_RSP_VLDC, TS_ATL_REG) VALUES (2, 'FGI', 'Fundo de Garantia para Investimentos', 1001, 987654321, 'BB1', '2026-03-31', '2012-06-01', '2035-12-31', 1, 'USRSIST', 'USRVLDC', '2026-04-01 08:00:00')");
             conn.commit();
 
-            // Agentes
-            st.execute("INSERT INTO DB2GFG.AGT_FNCO (CD_AGT_FNCO, CD_CLI, NM_ABVD_AGT_FNCO) VALUES (1, 1001, 'BANCO DO BRASIL SA')");
-            st.execute("INSERT INTO DB2GFG.AGT_FNCO (CD_AGT_FNCO, CD_CLI, NM_ABVD_AGT_FNCO) VALUES (2, 1002, 'CAIXA ECONOMICA FEDERAL')");
-            st.execute("INSERT INTO DB2GFG.AGT_FNCO (CD_AGT_FNCO, CD_CLI, NM_ABVD_AGT_FNCO) VALUES (3, 1003, 'BRADESCO SA')");
-            st.execute("INSERT INTO DB2GFG.AGT_FNCO (CD_AGT_FNCO, CD_CLI, NM_ABVD_AGT_FNCO) VALUES (4, 1004, 'ITAU UNIBANCO SA')");
-            st.execute("INSERT INTO DB2GFG.AGT_FNCO (CD_AGT_FNCO, CD_CLI, NM_ABVD_AGT_FNCO) VALUES (5, 1005, 'SANTANDER BR SA')");
-            st.execute("INSERT INTO DB2GFG.AGT_FNCO (CD_AGT_FNCO, CD_CLI, NM_ABVD_AGT_FNCO) VALUES (6, 1006, 'SICREDI')");
-            st.execute("INSERT INTO DB2GFG.AGT_FNCO (CD_AGT_FNCO, CD_CLI, NM_ABVD_AGT_FNCO) VALUES (7, 1007, 'SICOOB')");
-            conn.commit();
-
-            // Associações agente × fundo (todos os agentes para ambos os fundos)
-            String[][] ispbs = {
-                {"1","00000000","1001"}, {"2","36170101","1002"}, {"3","60746948","1003"},
-                {"4","60872504","1004"}, {"5","90400888","1005"}, {"6","01181521","1006"},
-                {"7","02038232","1007"}
+            // Agentes financeiros — 40 instituições com ISPB reais
+            // Formato: {id, cdCli, ISPB(8 chars), nome}
+            String[][] AGENTES_DADOS = {
+                {"1",  "1001", "00000000", "BANCO DO BRASIL SA"},
+                {"2",  "1002", "36170101", "CAIXA ECONOMICA FEDERAL"},
+                {"3",  "1003", "60746948", "BRADESCO SA"},
+                {"4",  "1004", "60872504", "ITAU UNIBANCO SA"},
+                {"5",  "1005", "90400888", "SANTANDER BRASIL SA"},
+                {"6",  "1006", "01181521", "SICREDI"},
+                {"7",  "1007", "02038232", "SICOOB"},
+                {"8",  "1008", "30306294", "BANCO BTG PACTUAL SA"},
+                {"9",  "1009", "33264668", "BANCO XP SA"},
+                {"10", "1010", "00416968", "BANCO INTER SA"},
+                {"11", "1011", "18236120", "NU PAGAMENTOS SA"},
+                {"12", "1012", "58160789", "BANCO SAFRA SA"},
+                {"13", "1013", "59588111", "BANCO VOTORANTIM SA"},
+                {"14", "1014", "06118668", "BANCO BMG SA"},
+                {"15", "1015", "92702067", "BANRISUL SA"},
+                {"16", "1016", "00204963", "BRB BANCO DE BRASILIA SA"},
+                {"17", "1017", "30723886", "BANCO MODAL SA"},
+                {"18", "1018", "59285411", "BANCO PAN SA"},
+                {"19", "1019", "25248816", "AGIBANK SA"},
+                {"20", "1020", "31872495", "C6 BANK SA"},
+                {"21", "1021", "92894922", "BANCO ORIGINAL SA"},
+                {"22", "1022", "17184037", "BANCO MERCANTIL DO BRASIL SA"},
+                {"23", "1023", "14388334", "PARANA BANCO SA"},
+                {"24", "1024", "03323840", "BANCO ALFA SA"},
+                {"25", "1025", "58616418", "BANCO FIBRA SA"},
+                {"26", "1026", "62232889", "BANCO DAYCOVAL SA"},
+                {"27", "1027", "60889128", "BANCO SOFISA SA"},
+                {"28", "1028", "31895683", "BANCO INDUSTRIAL DO BRASIL SA"},
+                {"29", "1029", "28195667", "BANCO ABC BRASIL SA"},
+                {"30", "1030", "01023570", "RABOBANK INTERNATIONAL BRASIL SA"},
+                {"31", "1031", "33172537", "BANCO JPMORGAN SA"},
+                {"32", "1032", "04332281", "GOLDMAN SACHS DO BRASIL SA"},
+                {"33", "1033", "01522368", "BNP PARIBAS BRASIL SA"},
+                {"34", "1034", "62331228", "DEUTSCHE BANK SA"},
+                {"35", "1035", "33042953", "CITIBANK NA"},
+                {"36", "1036", "01701201", "HSBC BRASIL SA"},
+                {"37", "1037", "62144175", "BANCO PINE SA"},
+                {"38", "1038", "20855875", "BANCO NEON SA"},
+                {"39", "1039", "09516419", "PICPAY BANK SA"},
+                {"40", "1040", "13673855", "BANCO WILL FINANCEIRA SA"}
             };
-            for (int fundo : new int[]{1, 2}) {
-                for (String[] a : ispbs) {
-                    int agId = Integer.parseInt(a[0]);
-                    st.execute("INSERT INTO DB2GFG.AGT_FNCO_FNDO_GRTR (CD_FNDO_GRTR, CD_AGT_FNCO, CD_TIP_EST_AGT, CD_TIP_ITCB_FNCO, CD_ISPB, NR_CTR_ITCB_DADO, CD_CLI, CD_PRD, NR_CT_DEP_AGT, NR_AG_CT_DEP_AGT, CD_USU_RSP_VLDC) VALUES (" + fundo + ", " + agId + ", 1, 1, '" + a[1] + "', " + (fundo * 100 + agId) + ", " + a[2] + ", 1, " + (100000000 + agId * 11111111 + fundo * 1000000) + ", " + a[2] + ", 'USRVLDC')");
-                }
+            for (String[] a : AGENTES_DADOS) {
+                st.execute("INSERT INTO DB2GFG.AGT_FNCO (CD_AGT_FNCO, CD_CLI, NM_ABVD_AGT_FNCO) VALUES ("
+                        + a[0] + ", " + a[1] + ", '" + a[3] + "')");
             }
             conn.commit();
+
+            // Associações agente × fundo (todos os 40 agentes para ambos os fundos)
+            for (int fundo : new int[]{1, 2}) {
+                for (String[] a : AGENTES_DADOS) {
+                    int agId  = Integer.parseInt(a[0]);
+                    int cdCli = Integer.parseInt(a[1]);
+                    st.execute("INSERT INTO DB2GFG.AGT_FNCO_FNDO_GRTR "
+                            + "(CD_FNDO_GRTR, CD_AGT_FNCO, CD_TIP_EST_AGT, CD_TIP_ITCB_FNCO, "
+                            + " CD_ISPB, NR_CTR_ITCB_DADO, CD_CLI, CD_PRD, "
+                            + " NR_CT_DEP_AGT, NR_AG_CT_DEP_AGT, CD_USU_RSP_VLDC) VALUES ("
+                            + fundo + ", " + agId + ", 1, 1, '" + a[2] + "', "
+                            + (fundo * 1000 + agId) + ", " + cdCli + ", 1, "
+                            + (100000000 + agId * 1000000 + fundo * 100) + ", "
+                            + cdCli + ", 'USRVLDC')");
+                }
+                conn.commit();
+            }
         }
         LOG.info("[SEED] Dados mestres reinseridos.");
     }

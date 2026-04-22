@@ -10,5 +10,6 @@ data:
   # Configurações não-sensíveis — valores sensíveis ficam no Secret
   QUARKUS_LOG_LEVEL: "INFO"
   QUARKUS_LOG_CATEGORY_COM_EXAMPLE_LEVEL: "DEBUG"
-  # DB2_PORT e DB2_DATABASE também ficam aqui por não serem sensíveis
-  # mas colocamos no Secret para centralizar tudo em 1 lugar
+  # URL pública da aplicação — usada pelo Swagger como server URL
+  # Descubra com: oc get route ms-operacao -n fgo-backend -o jsonpath='{.spec.host}'
+  APP_URL: "https://ms-operacao-fgo-backend.apps-crc.testing"

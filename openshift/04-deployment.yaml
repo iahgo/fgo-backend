@@ -59,10 +59,12 @@ spec:
               name: http
               protocol: TCP
 
-          # Todas as configs vêm do Secret — nenhuma variável sensível no YAML
+          # Configs: Secret (sensíveis) + ConfigMap (não-sensíveis)
           envFrom:
             - secretRef:
                 name: ms-operacao-secrets
+            - configMapRef:
+                name: ms-operacao-config
 
           # Liveness: se falhar, o container é reiniciado
           # Verifica que o processo não travou (Redis liveness check interno)

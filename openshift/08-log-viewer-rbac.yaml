@@ -1,0 +1,49 @@
+# =============================================================================
+# ServiceAccount "log-viewer" — acesso somente leitura ao namespace fgo-backend
+#
+# Cria um usuário técnico para colegas consultarem logs sem acesso admin.
+#
+# Após aplicar este manifesto, gere um token de acesso:
+#
+#   oc create token log-viewer -n fgo-backend --duration=8760h
+#
+# Use o token para fazer login:
+#   oc login --server=https://api.crc.testing:6443 --token=<TOKEN-GERADO>
+#
+# Ou acesse o console do OpenShift:
+#   https://console-openshift-console.apps-crc.testing
+#   → Add credentials → Token → cole o token acima
+#
+# Permissões concedidas (ClusterRole "view"):
+#   - Listar e ver pods, deployments, services, configmaps
+#   - Ver logs de pods: oc logs <pod> -n fgo-backend
+#   - Acessar o terminal de um pod NÃO é permitido (sem exec)
+# =============================================================================
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: log-viewer
+  namespace: fgo-backend
+  labels:
+    app.kubernetes.io/part-of: fgo
+    app.kubernetes.io/component: observability
+  annotations:
+    description: "Conta de visualização — logs e estado do cluster. Sem permissão de escrita."
+---
+# RoleBinding: vincula o ClusterRole "view" ao ServiceAccount no namespace fgo-backend
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: log-viewer-view
+  namespace: fgo-backend
+  labels:
+    app.kubernetes.io/part-of: fgo
+subjects:
+  - kind: ServiceAccount
+    name: log-viewer
+    namespace: fgo-backend
+roleRef:
+  kind: ClusterRole
+  name: view
+  apiGroup: rbac.authorization.k8s.io
