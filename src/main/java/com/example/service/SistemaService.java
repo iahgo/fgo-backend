@@ -3,6 +3,7 @@ package com.example.service;
 import com.example.dto.SistemaDto;
 import com.example.dto.SistemaDto.*;
 import io.agroal.api.AgroalDataSource;
+import io.quarkus.redis.client.RedisClient;
 import io.quarkus.redis.datasource.RedisDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -31,6 +32,9 @@ public class SistemaService {
     private static final Logger LOG = Logger.getLogger(SistemaService.class);
     private static final double GB = 1024.0 * 1024.0 * 1024.0;
     private static final double MB = 1024.0 * 1024.0;
+
+    @Inject
+    RedisClient redisClient;
 
     @Inject
     RedisDataSource redis;
@@ -137,7 +141,7 @@ public class SistemaService {
     private RedisDto coletarRedis() {
         RedisDto dto = new RedisDto();
         try {
-            String info = redis.server().info();
+            String info = redisClient.info(java.util.List.of()).toString();
             Map<String, String> kv = parseRedisInfo(info);
 
             dto.setVersao(kv.getOrDefault("redis_version", "?"));
