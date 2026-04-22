@@ -26,6 +26,10 @@ on:
         type: boolean
         default: false
 
+permissions:
+  checks: write
+  contents: read
+
 jobs:
 
   # ---------------------------------------------------------------
