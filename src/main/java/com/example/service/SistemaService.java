@@ -4,7 +4,6 @@ import com.example.dto.SistemaDto;
 import com.example.dto.SistemaDto.*;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.redis.client.RedisClient;
-import io.quarkus.redis.datasource.RedisDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
@@ -29,30 +28,32 @@ import java.util.Map;
 public class SistemaService {
 
     private static final Logger LOG = Logger.getLogger(SistemaService.class);
-    private static final double GB = 1024.0 * 1024.0 * 1024.0;
-    private static final double MB = 1024.0 * 1024.0;
+    private static final double GB  = 1024.0 * 1024.0 * 1024.0;
+    private static final double MB  = 1024.0 * 1024.0;
 
     @Inject RedisClient redisClient;
-    @Inject RedisDataSource redis;
     @Inject AgroalDataSource dataSource;
 
     public SistemaDto coletar() {
-        long ramTotalBytes = ramTotalBytes();
+        // RAM física do servidor — base para % de todos os componentes
+        long ramFisicaBytes = ramFisicaTotal();
+        double ramFisicaGb  = round2(ramFisicaBytes / GB);
+
         return new SistemaDto(
-                coletarServidor(ramTotalBytes),
-                coletarJvm(ramTotalBytes),
-                coletarRedis(ramTotalBytes),
+                coletarServidor(ramFisicaBytes),
+                coletarJvm(ramFisicaBytes),
+                coletarRedis(ramFisicaBytes),
                 coletarDb2(),
-                coletarProcessos(ramTotalBytes),
+                coletarProcessos(ramFisicaBytes, ramFisicaGb),
                 LocalDateTime.now()
         );
     }
 
     // =========================================================================
-    // SERVIDOR (OS)
+    // SERVIDOR
     // =========================================================================
 
-    private ServidorDto coletarServidor(long ramTotalBytes) {
+    private ServidorDto coletarServidor(long ramFisicaBytes) {
         ServidorDto dto = new ServidorDto();
 
         OperatingSystemMXBean os = ManagementFactory.getOperatingSystemMXBean();
@@ -66,26 +67,50 @@ public class SistemaService {
         catch (Exception e) { dto.setHostname("desconhecido"); }
 
         if (os instanceof com.sun.management.OperatingSystemMXBean sunOs) {
-            long total = sunOs.getTotalMemorySize();
-            long livre = sunOs.getFreeMemorySize();
-            long usado = total - livre;
+            long total  = sunOs.getTotalMemorySize();
+            long livre  = sunOs.getFreeMemorySize();
+            // Cache/buffers do kernel não contam como "em uso" de verdade
+            long cached = lerMeminfokB("Cached") * 1024L + lerMeminfokB("Buffers") * 1024L;
+            long usadoReal = total - livre - cached;
             dto.setMemoriaFisicaTotalGb(round2(total / GB));
             dto.setMemoriaFisicaLivreGb(round2(livre / GB));
-            dto.setMemoriaFisicaUsadaGb(round2(usado / GB));
-            dto.setMemoriaFisicaUsadaPct(total > 0 ? round2(100.0 * usado / total) : 0);
+            dto.setMemoriaFisicaUsadaGb(round2(usadoReal / GB));
+            dto.setMemoriaFisicaCachedGb(round2(cached / GB));
+            dto.setMemoriaFisicaUsadaPct(total > 0 ? round2(100.0 * usadoReal / total) : 0);
+            dto.setMemoriaFisicaDisponiveGb(round2(lerMeminfokB("MemAvailable") * 1024L / GB));
         }
 
+        // Discos reais (filtra overlay/tmpfs/shm)
         List<DiscoDto> discos = new ArrayList<>();
-        for (File root : File.listRoots()) {
-            long total = root.getTotalSpace();
-            if (total == 0) continue;
-            long livre = root.getFreeSpace();
-            long usado = total - livre;
-            discos.add(new DiscoDto(
-                    root.getAbsolutePath(),
-                    round2(total / GB), round2(livre / GB),
-                    round2(usado / GB), round2(100.0 * usado / total)
-            ));
+        try {
+            java.nio.file.FileSystem fs = java.nio.file.FileSystems.getDefault();
+            for (java.nio.file.FileStore store : fs.getFileStores()) {
+                String type = store.type();
+                if (type.equals("tmpfs") || type.equals("overlay") || type.equals("shm")
+                        || type.equals("devtmpfs") || type.equals("cgroup2")) continue;
+                long total = store.getTotalSpace();
+                if (total == 0) continue;
+                long usado = total - store.getUsableSpace();
+                discos.add(new DiscoDto(
+                        store.name() + " → " + store.toString().replaceAll(" \\(.*\\)$", ""),
+                        type,
+                        round2(total / GB),
+                        round2(store.getUsableSpace() / GB),
+                        round2(usado / GB),
+                        round2(100.0 * usado / total)
+                ));
+            }
+        } catch (Exception e) {
+            // fallback para File.listRoots()
+            for (File root : File.listRoots()) {
+                long total = root.getTotalSpace();
+                if (total == 0) continue;
+                long livre = root.getFreeSpace();
+                discos.add(new DiscoDto(root.getAbsolutePath(), "?",
+                        round2(total / GB), round2(livre / GB),
+                        round2((total - livre) / GB),
+                        round2(100.0 * (total - livre) / total)));
+            }
         }
         dto.setDiscos(discos);
         return dto;
@@ -95,7 +120,7 @@ public class SistemaService {
     // JVM
     // =========================================================================
 
-    private JvmDto coletarJvm(long ramTotalBytes) {
+    private JvmDto coletarJvm(long ramFisicaBytes) {
         JvmDto dto = new JvmDto();
 
         MemoryMXBean mem = ManagementFactory.getMemoryMXBean();
@@ -108,18 +133,18 @@ public class SistemaService {
         dto.setHeapMaxMb(round2(heapMax / MB));
         dto.setHeapUsadoPct(heapMax > 0 ? round2(100.0 * heapUsado / heapMax) : 0);
         dto.setNonHeapUsadoMb(round2(nonHeap / MB));
-        dto.setUptimeMs(ManagementFactory.getRuntimeMXBean().getUptime());
+
+        // RSS real do processo (VmRSS = memoria física ocupada na RAM, não virtual)
+        double rssMb = lerVmRss("/proc/self/status");
+        dto.setRssMb(rssMb);
+        dto.setRssDoSistemaPct(ramFisicaBytes > 0 ? round2(100.0 * rssMb * MB / ramFisicaBytes) : 0);
 
         ThreadMXBean threads = ManagementFactory.getThreadMXBean();
         dto.setThreadsAtivos(threads.getThreadCount());
         dto.setThreadsTotal((int) threads.getTotalStartedThreadCount());
+        dto.setUptimeMs(ManagementFactory.getRuntimeMXBean().getUptime());
 
-        // RSS real do processo JVM (VmRSS em /proc/self/status)
-        double rssMb = lerVmRss("/proc/self/status");
-        dto.setRssMb(rssMb);
-        dto.setRssDoSistemaPct(ramTotalBytes > 0 ? round2(100.0 * rssMb * MB / ramTotalBytes) : 0);
-
-        // Pool de conexões DB2 (Agroal)
+        // Pool de conexões DB2
         try {
             var metrics = dataSource.getMetrics();
             dto.setDb2ConexoesAtivas((int) metrics.activeCount());
@@ -127,7 +152,7 @@ public class SistemaService {
                     .connectionPoolConfiguration().maxSize());
             dto.setDb2TotalCriadas(metrics.creationCount());
         } catch (Exception e) {
-            LOG.debugf("[SISTEMA] Métricas Agroal indisponíveis: %s", e.getMessage());
+            LOG.debugf("[SISTEMA] Métricas Agroal: %s", e.getMessage());
         }
 
         return dto;
@@ -137,7 +162,7 @@ public class SistemaService {
     // REDIS
     // =========================================================================
 
-    private RedisDto coletarRedis(long ramTotalBytes) {
+    private RedisDto coletarRedis(long ramFisicaBytes) {
         RedisDto dto = new RedisDto();
         try {
             String info = redisClient.info(java.util.List.of()).toString();
@@ -153,10 +178,9 @@ public class SistemaService {
             dto.setMemoriaUsadaMb(round2(usedBytes / MB));
             dto.setMemoriaUsadaPicoMb(round2(parseLong(kv, "used_memory_peak") / MB));
             dto.setMemoriaDisponiveisystemMb(round2(parseLong(kv, "total_system_memory") / MB));
-            dto.setMemoriaUsadaDoSistemaPct(ramTotalBytes > 0
-                    ? round2(100.0 * usedBytes / ramTotalBytes) : 0);
+            dto.setMemoriaUsadaDoSistemaPct(ramFisicaBytes > 0
+                    ? round2(100.0 * usedBytes / ramFisicaBytes) : 0);
 
-            // Fragmentação (> 1.5 indica fragmentação excessiva)
             try {
                 dto.setFragmentacaoRatio(
                         Double.parseDouble(kv.getOrDefault("mem_fragmentation_ratio", "0")));
@@ -169,7 +193,6 @@ public class SistemaService {
             dto.setMissesCache(misses);
             dto.setHitRatioPct((hits + misses) > 0 ? round2(100.0 * hits / (hits + misses)) : 0);
 
-            // Keyspace — conta chaves em todos os DBs
             long totalChaves = 0;
             for (Map.Entry<String, String> e : kv.entrySet()) {
                 if (e.getKey().startsWith("db")) {
@@ -178,7 +201,7 @@ public class SistemaService {
                     if (idx >= 0) {
                         int end = v.indexOf(',', idx);
                         String num = end > 0 ? v.substring(idx + 5, end) : v.substring(idx + 5);
-                        totalChaves += Long.parseLong(num.trim());
+                        try { totalChaves += Long.parseLong(num.trim()); } catch (NumberFormatException ignored) {}
                     }
                 }
             }
@@ -198,7 +221,6 @@ public class SistemaService {
     private Db2Dto coletarDb2() {
         Db2Dto dto = new Db2Dto();
         List<TabelaDb2Dto> tabelas = new ArrayList<>();
-
         String sql = """
             SELECT T.TABNAME, T.TABSCHEMA,
                    COALESCE(T.CARD, -1)        AS CARD,
@@ -207,15 +229,12 @@ public class SistemaService {
                    T.STATUS
             FROM SYSCAT.TABLES T
             LEFT JOIN SYSCAT.TABLESPACES TS ON T.TBSPACE = TS.TBSPACE
-            WHERE T.TABSCHEMA = 'DB2GFG'
-              AND T.TYPE = 'T'
+            WHERE T.TABSCHEMA = 'DB2GFG' AND T.TYPE = 'T'
             ORDER BY FPAGES DESC
             """;
-
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
-
             while (rs.next()) {
                 tabelas.add(new TabelaDb2Dto(
                         rs.getString("TABNAME").trim(),
@@ -227,7 +246,6 @@ public class SistemaService {
                 ));
             }
             dto.setTabelas(tabelas);
-
         } catch (Exception e) {
             LOG.warnf("[SISTEMA] Falha ao consultar SYSCAT.TABLES: %s", e.getMessage());
             dto.setErro(e.getMessage());
@@ -237,40 +255,58 @@ public class SistemaService {
     }
 
     // =========================================================================
-    // PROCESSOS DO SO (lê /proc/[pid]/status via ProcessHandle)
+    // PROCESSOS — quem está usando a RAM do servidor
     // =========================================================================
 
-    private List<ProcessoDto> coletarProcessos(long ramTotalBytes) {
+    private List<ProcessoDto> coletarProcessos(long ramFisicaBytes, double ramFisicaGb) {
         List<ProcessoDto> lista = new ArrayList<>();
 
-        // Processos-chave a monitorar (por nome parcial do comando)
+        // grupos e palavras-chave de busca no caminho do executável
         String[][] alvos = {
-            {"JVM (ms-operacao)", "java"},
-            {"Redis",             "redis-server"},
-            {"DB2",               "db2sysc"},
-            {"nginx",             "nginx"},
+            {"CRC/OpenShift VM (qemu-kvm)", "qemu-kvm"},
+            {"DB2 (db2sysc)",               "db2sysc"},
+            {"JVM ms-operacao",             "java"},
+            {"nginx",                       "nginx: worker"},
+            {"Tailscale",                   "tailscaled"},
+            {"CRC daemon",                  "crc"},
+            {"GitHub Runner",               "Runner.Listener"},
         };
 
         for (String[] alvo : alvos) {
             String label = alvo[0];
-            String cmd   = alvo[1];
+            String busca = alvo[1];
 
-            ProcessHandle.allProcesses()
-                .filter(p -> p.info().command()
-                        .map(c -> c.contains(cmd))
-                        .orElse(false))
-                .limit(3) // agrupa até 3 processos do mesmo tipo (ex: workers nginx)
-                .forEach(p -> {
-                    double rssMb = lerVmRss("/proc/" + p.pid() + "/status");
-                    double pct   = ramTotalBytes > 0
-                            ? round2(100.0 * rssMb * MB / ramTotalBytes) : 0;
-                    String cmdRes = p.info().command()
-                            .map(c -> { int i = c.lastIndexOf('/'); return i >= 0 ? c.substring(i+1) : c; })
-                            .orElse(cmd);
-                    lista.add(new ProcessoDto(label, p.pid(), rssMb, pct, cmdRes));
-                });
+            List<ProcessHandle> encontrados = ProcessHandle.allProcesses()
+                .filter(p -> {
+                    String cmd = p.info().command().orElse("");
+                    String args = p.info().commandLine().orElse("");
+                    return cmd.contains(busca) || args.contains(busca);
+                })
+                .limit(4)
+                .toList();
+
+            if (encontrados.isEmpty()) continue;
+
+            // agrega RSs de múltiplos workers do mesmo tipo (ex: nginx workers)
+            double rssTotal = 0;
+            long   pid      = encontrados.get(0).pid();
+            for (ProcessHandle ph : encontrados) {
+                rssTotal += lerVmRss("/proc/" + ph.pid() + "/status");
+            }
+
+            double pct = ramFisicaBytes > 0
+                    ? round2(100.0 * rssTotal * MB / ramFisicaBytes) : 0;
+
+            String cmdResumido = encontrados.get(0).info().command()
+                    .map(c -> { int i = c.lastIndexOf('/'); return i >= 0 ? c.substring(i+1) : c; })
+                    .orElse(busca);
+            if (encontrados.size() > 1) cmdResumido += " ×" + encontrados.size();
+
+            lista.add(new ProcessoDto(label, pid, round2(rssTotal), pct, cmdResumido));
         }
 
+        // Ordena por RSS decrescente
+        lista.sort((a, b) -> Double.compare(b.getRssMb(), a.getRssMb()));
         return lista;
     }
 
@@ -278,29 +314,36 @@ public class SistemaService {
     // UTILS
     // =========================================================================
 
-    /** Lê VmRSS de /proc/[pid]/status e retorna o valor em MB. */
     private double lerVmRss(String path) {
         try {
             return Files.readAllLines(Path.of(path)).stream()
                     .filter(l -> l.startsWith("VmRSS"))
                     .findFirst()
                     .map(l -> {
-                        String[] parts = l.trim().split("\\s+");
-                        return parts.length >= 2 ? Double.parseDouble(parts[1]) / 1024.0 : 0.0;
+                        String[] p = l.trim().split("\\s+");
+                        return p.length >= 2 ? Double.parseDouble(p[1]) / 1024.0 : 0.0;
                     })
                     .orElse(0.0);
-        } catch (Exception e) {
-            return 0.0;
-        }
+        } catch (Exception e) { return 0.0; }
     }
 
-    /** RAM física total do servidor em bytes (via com.sun.management). */
-    private long ramTotalBytes() {
+    /** Lê um campo do /proc/meminfo em kB. */
+    private long lerMeminfokB(String campo) {
+        try {
+            return Files.readAllLines(Path.of("/proc/meminfo")).stream()
+                    .filter(l -> l.startsWith(campo + ":"))
+                    .findFirst()
+                    .map(l -> Long.parseLong(l.trim().split("\\s+")[1]))
+                    .orElse(0L);
+        } catch (Exception e) { return 0L; }
+    }
+
+    private long ramFisicaTotal() {
         OperatingSystemMXBean os = ManagementFactory.getOperatingSystemMXBean();
         if (os instanceof com.sun.management.OperatingSystemMXBean sunOs) {
             return sunOs.getTotalMemorySize();
         }
-        return 0L;
+        return lerMeminfokB("MemTotal") * 1024L;
     }
 
     private Map<String, String> parseRedisInfo(String info) {
@@ -308,18 +351,13 @@ public class SistemaService {
         for (String linha : info.split("\r?\n")) {
             if (linha.startsWith("#") || linha.isBlank()) continue;
             int sep = linha.indexOf(':');
-            if (sep > 0) {
-                map.put(linha.substring(0, sep).trim(), linha.substring(sep + 1).trim());
-            }
+            if (sep > 0) map.put(linha.substring(0, sep).trim(), linha.substring(sep + 1).trim());
         }
         return map;
     }
 
-    private String formatUptime(long segundos) {
-        long dias    = segundos / 86400;
-        long horas   = (segundos % 86400) / 3600;
-        long minutos = (segundos % 3600) / 60;
-        return String.format("%dd %02dh %02dm", dias, horas, minutos);
+    private String formatUptime(long s) {
+        return String.format("%dd %02dh %02dm", s / 86400, (s % 86400) / 3600, (s % 3600) / 60);
     }
 
     private long parseLong(Map<String, String> kv, String key) {
@@ -327,7 +365,5 @@ public class SistemaService {
         catch (NumberFormatException e) { return 0; }
     }
 
-    private static double round2(double v) {
-        return Math.round(v * 100.0) / 100.0;
-    }
+    private static double round2(double v) { return Math.round(v * 100.0) / 100.0; }
 }

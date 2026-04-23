@@ -52,43 +52,51 @@ public class SistemaDto {
         private double memoriaFisicaTotalGb;
         private double memoriaFisicaLivreGb;
         private double memoriaFisicaUsadaGb;
+        private double memoriaFisicaCachedGb;      // cache/buffers do kernel (liberável)
+        private double memoriaFisicaDisponiveGb;   // MemAvailable = livre + cache liberável
         private double memoriaFisicaUsadaPct;
         private long uptimeMs;
         private List<DiscoDto> discos;
 
-        public String getHostname()                         { return hostname; }
-        public void setHostname(String v)                   { this.hostname = v; }
-        public String getOs()                               { return os; }
-        public void setOs(String v)                         { this.os = v; }
-        public String getArquitetura()                      { return arquitetura; }
-        public void setArquitetura(String v)                { this.arquitetura = v; }
-        public int getCpus()                                { return cpus; }
-        public void setCpus(int v)                          { this.cpus = v; }
-        public double getLoadAvg1m()                        { return loadAvg1m; }
-        public void setLoadAvg1m(double v)                  { this.loadAvg1m = v; }
-        public double getMemoriaFisicaTotalGb()             { return memoriaFisicaTotalGb; }
-        public void setMemoriaFisicaTotalGb(double v)       { this.memoriaFisicaTotalGb = v; }
-        public double getMemoriaFisicaLivreGb()             { return memoriaFisicaLivreGb; }
-        public void setMemoriaFisicaLivreGb(double v)       { this.memoriaFisicaLivreGb = v; }
-        public double getMemoriaFisicaUsadaGb()             { return memoriaFisicaUsadaGb; }
-        public void setMemoriaFisicaUsadaGb(double v)       { this.memoriaFisicaUsadaGb = v; }
-        public double getMemoriaFisicaUsadaPct()            { return memoriaFisicaUsadaPct; }
-        public void setMemoriaFisicaUsadaPct(double v)      { this.memoriaFisicaUsadaPct = v; }
-        public long getUptimeMs()                           { return uptimeMs; }
-        public void setUptimeMs(long v)                     { this.uptimeMs = v; }
-        public List<DiscoDto> getDiscos()                   { return discos; }
-        public void setDiscos(List<DiscoDto> v)             { this.discos = v; }
+        public String getHostname()                              { return hostname; }
+        public void setHostname(String v)                        { this.hostname = v; }
+        public String getOs()                                    { return os; }
+        public void setOs(String v)                              { this.os = v; }
+        public String getArquitetura()                           { return arquitetura; }
+        public void setArquitetura(String v)                     { this.arquitetura = v; }
+        public int getCpus()                                     { return cpus; }
+        public void setCpus(int v)                               { this.cpus = v; }
+        public double getLoadAvg1m()                             { return loadAvg1m; }
+        public void setLoadAvg1m(double v)                       { this.loadAvg1m = v; }
+        public double getMemoriaFisicaTotalGb()                  { return memoriaFisicaTotalGb; }
+        public void setMemoriaFisicaTotalGb(double v)            { this.memoriaFisicaTotalGb = v; }
+        public double getMemoriaFisicaLivreGb()                  { return memoriaFisicaLivreGb; }
+        public void setMemoriaFisicaLivreGb(double v)            { this.memoriaFisicaLivreGb = v; }
+        public double getMemoriaFisicaUsadaGb()                  { return memoriaFisicaUsadaGb; }
+        public void setMemoriaFisicaUsadaGb(double v)            { this.memoriaFisicaUsadaGb = v; }
+        public double getMemoriaFisicaCachedGb()                 { return memoriaFisicaCachedGb; }
+        public void setMemoriaFisicaCachedGb(double v)           { this.memoriaFisicaCachedGb = v; }
+        public double getMemoriaFisicaDisponiveGb()              { return memoriaFisicaDisponiveGb; }
+        public void setMemoriaFisicaDisponiveGb(double v)        { this.memoriaFisicaDisponiveGb = v; }
+        public double getMemoriaFisicaUsadaPct()                 { return memoriaFisicaUsadaPct; }
+        public void setMemoriaFisicaUsadaPct(double v)           { this.memoriaFisicaUsadaPct = v; }
+        public long getUptimeMs()                                { return uptimeMs; }
+        public void setUptimeMs(long v)                          { this.uptimeMs = v; }
+        public List<DiscoDto> getDiscos()                        { return discos; }
+        public void setDiscos(List<DiscoDto> v)                  { this.discos = v; }
     }
 
     public static class DiscoDto {
         private String caminho;
+        private String tipo;       // xfs, ext4, etc
         private double totalGb;
         private double livreGb;
         private double usadoGb;
         private double usadoPct;
 
-        public DiscoDto(String caminho, double totalGb, double livreGb, double usadoGb, double usadoPct) {
+        public DiscoDto(String caminho, String tipo, double totalGb, double livreGb, double usadoGb, double usadoPct) {
             this.caminho  = caminho;
+            this.tipo     = tipo;
             this.totalGb  = totalGb;
             this.livreGb  = livreGb;
             this.usadoGb  = usadoGb;
@@ -96,6 +104,7 @@ public class SistemaDto {
         }
 
         public String getCaminho()      { return caminho; }
+        public String getTipo()         { return tipo; }
         public double getTotalGb()      { return totalGb; }
         public double getLivreGb()      { return livreGb; }
         public double getUsadoGb()      { return usadoGb; }
