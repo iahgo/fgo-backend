@@ -3,6 +3,7 @@ package com.example.repository;
 import com.example.domain.AgenteAgregado;
 import com.example.domain.AgenteFinanceiro;
 import com.example.domain.OperacaoAgregada;
+import com.example.domain.OperacaoCreditoFundoGarantidor;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
@@ -150,6 +151,80 @@ public class OperacaoRepository {
                 """, OperacaoAgregada.class)
                 .setParameter("ano", ano)
                 .setParameter("mes", mes)
+                .getResultList();
+    }
+
+    // =========================================================================
+    // QUERY: OPERAÇÕES INDIVIDUAIS COM PAGINAÇÃO
+    // =========================================================================
+
+    /** Lista operações individuais de um agente com paginação. */
+    @Transactional(Transactional.TxType.REQUIRED)
+    public List<OperacaoCreditoFundoGarantidor> listarPorAgente(int codAgente, int page, int size) {
+        return em.createQuery("""
+                SELECT o FROM OperacaoCreditoFundoGarantidor o
+                WHERE o.cdAgtFnco = :codAgente
+                ORDER BY o.dtFrmzOpr DESC, o.cdOprCrdFndo DESC
+                """, OperacaoCreditoFundoGarantidor.class)
+                .setParameter("codAgente", codAgente)
+                .setFirstResult(page * size)
+                .setMaxResults(size)
+                .getResultList();
+    }
+
+    /** Conta operações de um agente (para paginação). */
+    @Transactional(Transactional.TxType.REQUIRED)
+    public long contarPorAgente(int codAgente) {
+        return em.createQuery("""
+                SELECT COUNT(o) FROM OperacaoCreditoFundoGarantidor o
+                WHERE o.cdAgtFnco = :codAgente
+                """, Long.class)
+                .setParameter("codAgente", codAgente)
+                .getSingleResult();
+    }
+
+    /** Lista operações filtrando por agente e mês (ano-mes = "2026-04"), paginado. */
+    @Transactional(Transactional.TxType.REQUIRED)
+    public List<OperacaoCreditoFundoGarantidor> listarPorAgenteMes(int codAgente, int ano, int mes, int page, int size) {
+        return em.createQuery("""
+                SELECT o FROM OperacaoCreditoFundoGarantidor o
+                WHERE o.cdAgtFnco = :codAgente
+                  AND EXTRACT(YEAR FROM o.dtFrmzOpr) = :ano
+                  AND EXTRACT(MONTH FROM o.dtFrmzOpr) = :mes
+                ORDER BY o.cdOprCrdFndo DESC
+                """, OperacaoCreditoFundoGarantidor.class)
+                .setParameter("codAgente", codAgente)
+                .setParameter("ano", ano)
+                .setParameter("mes", mes)
+                .setFirstResult(page * size)
+                .setMaxResults(size)
+                .getResultList();
+    }
+
+    /** Conta operações de um agente em um mês. */
+    @Transactional(Transactional.TxType.REQUIRED)
+    public long contarPorAgenteMes(int codAgente, int ano, int mes) {
+        return em.createQuery("""
+                SELECT COUNT(o) FROM OperacaoCreditoFundoGarantidor o
+                WHERE o.cdAgtFnco = :codAgente
+                  AND EXTRACT(YEAR FROM o.dtFrmzOpr) = :ano
+                  AND EXTRACT(MONTH FROM o.dtFrmzOpr) = :mes
+                """, Long.class)
+                .setParameter("codAgente", codAgente)
+                .setParameter("ano", ano)
+                .setParameter("mes", mes)
+                .getSingleResult();
+    }
+
+    /** Conta total de operações por agente — para stats no /api/agentes. */
+    @Transactional(Transactional.TxType.REQUIRED)
+    public List<Object[]> contarOperacoesPorAgente() {
+        return em.createQuery("""
+                SELECT o.cdAgtFnco, COUNT(o)
+                FROM OperacaoCreditoFundoGarantidor o
+                GROUP BY o.cdAgtFnco
+                ORDER BY o.cdAgtFnco
+                """, Object[].class)
                 .getResultList();
     }
 
