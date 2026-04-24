@@ -122,15 +122,24 @@ public class SeedService {
         try (Connection conn = dataSource.getConnection()) {
             conn.setAutoCommit(false);
 
+            long idInicial = 1;
             if (limpar) {
                 statusMsg = "Limpando dados existentes...";
                 limparDados(conn);
                 statusMsg = "Reinserindo dados mestres...";
                 reinserirMasterData(conn);
+            } else {
+                // Descobre o maior ID já existente para não colidir na PK
+                try (Statement st = conn.createStatement();
+                     ResultSet rs = st.executeQuery(
+                             "SELECT COALESCE(MAX(CD_OPR_CRD_FNDO), 0) FROM DB2GFG.OPR_CRD_FNDO_GRTR")) {
+                    if (rs.next()) idInicial = rs.getLong(1) + 1;
+                }
+                LOG.infof("[SEED] limpar=false — iniciando IDs a partir de %d", idInicial);
             }
 
             statusMsg = "Gerando operações...";
-            gerarOperacoes(conn, quantidade);
+            gerarOperacoes(conn, quantidade, idInicial);
 
             statusMsg = "Gerando remessas...";
             gerarRemessas(conn);
@@ -316,8 +325,8 @@ public class SeedService {
     // Geração das operações (JDBC batch)
     // =====================================================================
 
-    private void gerarOperacoes(Connection conn, long quantidade) throws SQLException {
-        LOG.infof("[SEED] Iniciando geração de %d operações (lote=%d)...", quantidade, BATCH_SIZE);
+    private void gerarOperacoes(Connection conn, long quantidade, long idInicial) throws SQLException {
+        LOG.infof("[SEED] Iniciando geração de %d operações a partir do id=%d (lote=%d)...", quantidade, idInicial, BATCH_SIZE);
 
         String sql = """
             INSERT INTO DB2GFG.OPR_CRD_FNDO_GRTR (
@@ -340,21 +349,23 @@ public class SeedService {
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             long noBatch = 0;
-            for (long i = 1; i <= quantidade; i++) {
+            long fim = idInicial + quantidade - 1;
+            for (long i = idInicial; i <= fim; i++) {
                 preencherLinha(ps, i, rnd);
                 ps.addBatch();
                 noBatch++;
 
+                long inseridos = i - idInicial + 1;
                 if (noBatch >= BATCH_SIZE) {
                     executarBatchComLog(ps, conn, i);
-                    progresso.set(i);
+                    progresso.set(inseridos);
                     noBatch = 0;
-                    statusMsg = String.format("Inserindo: %d/%d (%.1f%%)", i, quantidade, 100.0 * i / quantidade);
+                    statusMsg = String.format("Inserindo: %d/%d (%.1f%%)", inseridos, quantidade, 100.0 * inseridos / quantidade);
                     LOG.infof("[SEED] %s", statusMsg);
                 }
             }
             if (noBatch > 0) {
-                executarBatchComLog(ps, conn, quantidade);
+                executarBatchComLog(ps, conn, fim);
                 progresso.set(quantidade);
             }
         }
