@@ -325,7 +325,34 @@ public class SeedService {
     // Geração das operações (JDBC batch)
     // =====================================================================
 
+    private int[] buscarAgentesExistentes(Connection conn) throws SQLException {
+        java.util.List<Integer> lista = new java.util.ArrayList<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT CD_AGT_FNCO FROM DB2GFG.AGT_FNCO ORDER BY CD_AGT_FNCO")) {
+            while (rs.next()) lista.add(rs.getInt(1));
+        }
+        if (lista.isEmpty()) {
+            LOG.warn("[SEED] AGT_FNCO vazia — usando array padrão");
+            return AGENTES;
+        }
+        LOG.infof("[SEED] %d agentes encontrados no DB: %s", lista.size(), lista);
+        return lista.stream().mapToInt(Integer::intValue).toArray();
+    }
+
+    private int[] buscarFundosExistentes(Connection conn) throws SQLException {
+        java.util.List<Integer> lista = new java.util.ArrayList<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT CD_FNDO_GRTR FROM DB2GFG.FNDO_GRTR ORDER BY CD_FNDO_GRTR")) {
+            while (rs.next()) lista.add(rs.getInt(1));
+        }
+        if (lista.isEmpty()) return FUNDOS;
+        return lista.stream().mapToInt(Integer::intValue).toArray();
+    }
+
     private void gerarOperacoes(Connection conn, long quantidade, long idInicial) throws SQLException {
+        // Usa apenas agentes/fundos que existem no DB (evita FK -530 com limpar=false)
+        int[] agentesDb = buscarAgentesExistentes(conn);
+        int[] fundosDb  = buscarFundosExistentes(conn);
         LOG.infof("[SEED] Iniciando geração de %d operações a partir do id=%d (lote=%d)...", quantidade, idInicial, BATCH_SIZE);
 
         String sql = """
@@ -351,7 +378,7 @@ public class SeedService {
             long noBatch = 0;
             long fim = idInicial + quantidade - 1;
             for (long i = idInicial; i <= fim; i++) {
-                preencherLinha(ps, i, rnd);
+                preencherLinha(ps, i, rnd, agentesDb, fundosDb);
                 ps.addBatch();
                 noBatch++;
 
@@ -494,7 +521,7 @@ public class SeedService {
         LOG.infof("[SEED] %d remessas inseridas (1/agente/fundo/dia desde 2024-01-01).", id - 1);
     }
 
-    private void preencherLinha(PreparedStatement ps, long id, ThreadLocalRandom rnd) throws SQLException {
+    private void preencherLinha(PreparedStatement ps, long id, ThreadLocalRandom rnd, int[] agentesDb, int[] fundosDb) throws SQLException {
         // Datas: 40% Abr-2026 (mês atual p/ warm-up), 60% Jan-2020 a Mar-2026
         LocalDate dtFrmz = gerarData(rnd);
         LocalDate dtVnct = dtFrmz.plusYears(3 + rnd.nextInt(8)); // 3-10 anos de prazo
@@ -518,7 +545,7 @@ public class SeedService {
             cdTipEstOpr = (short) (r < 6 ? 1 : r < 8 ? 2 : r < 9 ? 4 : 5); // Ativa, Encerrada, Liquidada, Honrada
         }
 
-        int agente = AGENTES[rnd.nextInt(AGENTES.length)];
+        int agente = agentesDb[rnd.nextInt(agentesDb.length)];
 
         // CHAR(20) para CD_IDFR_EXNO_OPR
         String extRef = String.format("%-20s", "EXT" + agente + "-" + id).substring(0, 20);
@@ -527,7 +554,7 @@ public class SeedService {
 
         int col = 1;
         ps.setInt   (col++, (int)(id % Integer.MAX_VALUE + 1));                // CD_OPR_CRD_FNDO
-        ps.setInt   (col++, FUNDOS[rnd.nextInt(FUNDOS.length)]);               // CD_FNDO_GRTR
+        ps.setInt   (col++, fundosDb[rnd.nextInt(fundosDb.length)]);            // CD_FNDO_GRTR
         ps.setInt   (col++, agente);                                            // CD_AGT_FNCO
         ps.setString(col++, extRef);                                            // CD_IDFR_EXNO_OPR CHAR(20)
         ps.setShort (col++, MODALIDS[rnd.nextInt(MODALIDS.length)]);           // CD_TIP_MDLD_CRD
