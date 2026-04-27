@@ -195,12 +195,133 @@ public class SeedService {
     }
 
     // =====================================================================
-    // Reinserção das tabelas de domínio e mestres
+    // Dados mestre fixos (script)
+    // =====================================================================
+
+    // {id, cdCli, ISPB(8 chars), nome}
+    static final String[][] AGENTES_DADOS = {
+        {"1",  "1001", "00000000", "BANCO DO BRASIL SA"},
+        {"2",  "1002", "36170101", "CAIXA ECONOMICA FEDERAL"},
+        {"3",  "1003", "60746948", "BRADESCO SA"},
+        {"4",  "1004", "60872504", "ITAU UNIBANCO SA"},
+        {"5",  "1005", "90400888", "SANTANDER BRASIL SA"},
+        {"6",  "1006", "01181521", "SICREDI"},
+        {"7",  "1007", "02038232", "SICOOB"},
+        {"8",  "1008", "30306294", "BANCO BTG PACTUAL SA"},
+        {"9",  "1009", "33264668", "BANCO XP SA"},
+        {"10", "1010", "00416968", "BANCO INTER SA"},
+        {"11", "1011", "18236120", "NU PAGAMENTOS SA"},
+        {"12", "1012", "58160789", "BANCO SAFRA SA"},
+        {"13", "1013", "59588111", "BANCO VOTORANTIM SA"},
+        {"14", "1014", "06118668", "BANCO BMG SA"},
+        {"15", "1015", "92702067", "BANRISUL SA"},
+        {"16", "1016", "00204963", "BRB BANCO DE BRASILIA SA"},
+        {"17", "1017", "30723886", "BANCO MODAL SA"},
+        {"18", "1018", "59285411", "BANCO PAN SA"},
+        {"19", "1019", "25248816", "AGIBANK SA"},
+        {"20", "1020", "31872495", "C6 BANK SA"},
+        {"21", "1021", "92894922", "BANCO ORIGINAL SA"},
+        {"22", "1022", "17184037", "BANCO MERCANTIL DO BRASIL SA"},
+        {"23", "1023", "14388334", "PARANA BANCO SA"},
+        {"24", "1024", "03323840", "BANCO ALFA SA"},
+        {"25", "1025", "58616418", "BANCO FIBRA SA"},
+        {"26", "1026", "62232889", "BANCO DAYCOVAL SA"},
+        {"27", "1027", "60889128", "BANCO SOFISA SA"},
+        {"28", "1028", "31895683", "BANCO INDUSTRIAL DO BRASIL SA"},
+        {"29", "1029", "28195667", "BANCO ABC BRASIL SA"},
+        {"30", "1030", "01023570", "RABOBANK INTERNATIONAL BRASIL SA"},
+        {"31", "1031", "33172537", "BANCO JPMORGAN SA"},
+        {"32", "1032", "04332281", "GOLDMAN SACHS DO BRASIL SA"},
+        {"33", "1033", "01522368", "BNP PARIBAS BRASIL SA"},
+        {"34", "1034", "62331228", "DEUTSCHE BANK SA"},
+        {"35", "1035", "33042953", "CITIBANK NA"},
+        {"36", "1036", "01701201", "HSBC BRASIL SA"},
+        {"37", "1037", "62144175", "BANCO PINE SA"},
+        {"38", "1038", "20855875", "BANCO NEON SA"},
+        {"39", "1039", "09516419", "PICPAY BANK SA"},
+        {"40", "1040", "13673855", "BANCO WILL FINANCEIRA SA"}
+    };
+
+    // =====================================================================
+    // Reinserção completa (usada pelo seed massivo)
     // =====================================================================
 
     private void reinserirMasterData(Connection conn) throws SQLException {
-        try (Statement st = conn.createStatement()) {
+        seedTiposInterno(conn);
+        seedFundosInterno(conn);
+        seedAgentesInterno(conn);
+        LOG.info("[SEED] Dados mestres reinseridos.");
+    }
 
+    // =====================================================================
+    // Scripts individuais por tabela — públicos para endpoints unitários
+    // =====================================================================
+
+    /**
+     * Popula todas as tabelas de domínio/lookup (TIP_* + CT_MVT_GRT_OPR).
+     * Com limpar=true apaga os registros existentes antes de inserir.
+     */
+    public void seedTipos(boolean limpar) throws SQLException {
+        try (Connection conn = dataSource.getConnection()) {
+            conn.setAutoCommit(false);
+            if (limpar) {
+                try (Statement st = conn.createStatement()) {
+                    st.execute("DELETE FROM DB2GFG.CT_MVT_GRT_OPR");  conn.commit();
+                    st.execute("DELETE FROM DB2GFG.TIP_PGM_CRD");      conn.commit();
+                    st.execute("DELETE FROM DB2GFG.TIP_FON_RCS");      conn.commit();
+                    st.execute("DELETE FROM DB2GFG.TIP_CND_ESPL_OPR"); conn.commit();
+                    st.execute("DELETE FROM DB2GFG.TIP_PBCO_ALVO");    conn.commit();
+                    st.execute("DELETE FROM DB2GFG.TIP_EST_OPR");      conn.commit();
+                    st.execute("DELETE FROM DB2GFG.TIP_RGAO");         conn.commit();
+                }
+            }
+            seedTiposInterno(conn);
+        }
+        LOG.info("[SEED-SCRIPT] Tipos populados.");
+    }
+
+    /**
+     * Popula FNDO_GRTR (FGO e FGI).
+     * Com limpar=true apaga AGT_FNCO_FNDO_GRTR e FNDO_GRTR antes de inserir.
+     */
+    public void seedFundos(boolean limpar) throws SQLException {
+        try (Connection conn = dataSource.getConnection()) {
+            conn.setAutoCommit(false);
+            if (limpar) {
+                try (Statement st = conn.createStatement()) {
+                    st.execute("DELETE FROM DB2GFG.AGT_FNCO_FNDO_GRTR"); conn.commit();
+                    st.execute("DELETE FROM DB2GFG.FNDO_GRTR");           conn.commit();
+                }
+            }
+            seedFundosInterno(conn);
+        }
+        LOG.info("[SEED-SCRIPT] Fundos populados.");
+    }
+
+    /**
+     * Popula AGT_FNCO (40 agentes) e AGT_FNCO_FNDO_GRTR (associação agente × fundo).
+     * Com limpar=true apaga as associações e os agentes antes de inserir.
+     */
+    public void seedAgentes(boolean limpar) throws SQLException {
+        try (Connection conn = dataSource.getConnection()) {
+            conn.setAutoCommit(false);
+            if (limpar) {
+                try (Statement st = conn.createStatement()) {
+                    st.execute("DELETE FROM DB2GFG.AGT_FNCO_FNDO_GRTR"); conn.commit();
+                    st.execute("DELETE FROM DB2GFG.AGT_FNCO");            conn.commit();
+                }
+            }
+            seedAgentesInterno(conn);
+        }
+        LOG.info("[SEED-SCRIPT] Agentes populados.");
+    }
+
+    // =====================================================================
+    // Implementações internas (reutilizadas pelo seed massivo e pelos scripts)
+    // =====================================================================
+
+    private void seedTiposInterno(Connection conn) throws SQLException {
+        try (Statement st = conn.createStatement()) {
             st.execute("INSERT INTO DB2GFG.TIP_EST_OPR VALUES (1, 'Ativa')");
             st.execute("INSERT INTO DB2GFG.TIP_EST_OPR VALUES (2, 'Encerrada')");
             st.execute("INSERT INTO DB2GFG.TIP_EST_OPR VALUES (3, 'Inadimplente')");
@@ -246,55 +367,19 @@ public class SeedService {
             st.execute("INSERT INTO DB2GFG.CT_MVT_GRT_OPR (NR_SEQL_CT_MVT, NM_CT_MVT_GRT_OPR) VALUES (2, 'Conta principal FGI')");
             st.execute("INSERT INTO DB2GFG.CT_MVT_GRT_OPR (NR_SEQL_CT_MVT, NM_CT_MVT_GRT_OPR) VALUES (3, 'Conta reserva')");
             conn.commit();
+        }
+    }
 
+    private void seedFundosInterno(Connection conn) throws SQLException {
+        try (Statement st = conn.createStatement()) {
             st.execute("INSERT INTO DB2GFG.FNDO_GRTR (CD_FNDO_GRTR, SG_FNDO_GRTR, NM_FNDO_GRTR, NR_AG_CT_MVT_FNDO, NR_CT_MVT_FNDO, CD_CIA_CTB, IDT_ULT_FCHT_BAL, DT_INC_FNDO_GRTR, DT_ECR_FNDO_GRTR, CD_TIP_EST_ENDO, CD_USU_RSP_ATL_REG, CD_USU_RSP_VLDC, TS_ATL_REG) VALUES (1, 'FGO', 'Fundo de Garantia de Operacoes', 1001, 123456789, 'BB1', '2026-03-31', '2010-01-01', '2035-12-31', 1, 'USRSIST', 'USRVLDC', '2026-04-01 08:00:00')");
             st.execute("INSERT INTO DB2GFG.FNDO_GRTR (CD_FNDO_GRTR, SG_FNDO_GRTR, NM_FNDO_GRTR, NR_AG_CT_MVT_FNDO, NR_CT_MVT_FNDO, CD_CIA_CTB, IDT_ULT_FCHT_BAL, DT_INC_FNDO_GRTR, DT_ECR_FNDO_GRTR, CD_TIP_EST_ENDO, CD_USU_RSP_ATL_REG, CD_USU_RSP_VLDC, TS_ATL_REG) VALUES (2, 'FGI', 'Fundo de Garantia para Investimentos', 1001, 987654321, 'BB1', '2026-03-31', '2012-06-01', '2035-12-31', 1, 'USRSIST', 'USRVLDC', '2026-04-01 08:00:00')");
             conn.commit();
+        }
+    }
 
-            // Agentes financeiros — 40 instituições com ISPB reais
-            // Formato: {id, cdCli, ISPB(8 chars), nome}
-            String[][] AGENTES_DADOS = {
-                {"1",  "1001", "00000000", "BANCO DO BRASIL SA"},
-                {"2",  "1002", "36170101", "CAIXA ECONOMICA FEDERAL"},
-                {"3",  "1003", "60746948", "BRADESCO SA"},
-                {"4",  "1004", "60872504", "ITAU UNIBANCO SA"},
-                {"5",  "1005", "90400888", "SANTANDER BRASIL SA"},
-                {"6",  "1006", "01181521", "SICREDI"},
-                {"7",  "1007", "02038232", "SICOOB"},
-                {"8",  "1008", "30306294", "BANCO BTG PACTUAL SA"},
-                {"9",  "1009", "33264668", "BANCO XP SA"},
-                {"10", "1010", "00416968", "BANCO INTER SA"},
-                {"11", "1011", "18236120", "NU PAGAMENTOS SA"},
-                {"12", "1012", "58160789", "BANCO SAFRA SA"},
-                {"13", "1013", "59588111", "BANCO VOTORANTIM SA"},
-                {"14", "1014", "06118668", "BANCO BMG SA"},
-                {"15", "1015", "92702067", "BANRISUL SA"},
-                {"16", "1016", "00204963", "BRB BANCO DE BRASILIA SA"},
-                {"17", "1017", "30723886", "BANCO MODAL SA"},
-                {"18", "1018", "59285411", "BANCO PAN SA"},
-                {"19", "1019", "25248816", "AGIBANK SA"},
-                {"20", "1020", "31872495", "C6 BANK SA"},
-                {"21", "1021", "92894922", "BANCO ORIGINAL SA"},
-                {"22", "1022", "17184037", "BANCO MERCANTIL DO BRASIL SA"},
-                {"23", "1023", "14388334", "PARANA BANCO SA"},
-                {"24", "1024", "03323840", "BANCO ALFA SA"},
-                {"25", "1025", "58616418", "BANCO FIBRA SA"},
-                {"26", "1026", "62232889", "BANCO DAYCOVAL SA"},
-                {"27", "1027", "60889128", "BANCO SOFISA SA"},
-                {"28", "1028", "31895683", "BANCO INDUSTRIAL DO BRASIL SA"},
-                {"29", "1029", "28195667", "BANCO ABC BRASIL SA"},
-                {"30", "1030", "01023570", "RABOBANK INTERNATIONAL BRASIL SA"},
-                {"31", "1031", "33172537", "BANCO JPMORGAN SA"},
-                {"32", "1032", "04332281", "GOLDMAN SACHS DO BRASIL SA"},
-                {"33", "1033", "01522368", "BNP PARIBAS BRASIL SA"},
-                {"34", "1034", "62331228", "DEUTSCHE BANK SA"},
-                {"35", "1035", "33042953", "CITIBANK NA"},
-                {"36", "1036", "01701201", "HSBC BRASIL SA"},
-                {"37", "1037", "62144175", "BANCO PINE SA"},
-                {"38", "1038", "20855875", "BANCO NEON SA"},
-                {"39", "1039", "09516419", "PICPAY BANK SA"},
-                {"40", "1040", "13673855", "BANCO WILL FINANCEIRA SA"}
-            };
+    private void seedAgentesInterno(Connection conn) throws SQLException {
+        try (Statement st = conn.createStatement()) {
             for (String[] a : AGENTES_DADOS) {
                 st.execute("INSERT INTO DB2GFG.AGT_FNCO (CD_AGT_FNCO, CD_CLI, NM_ABVD_AGT_FNCO) VALUES ("
                         + a[0] + ", " + a[1] + ", '" + a[3] + "')");
@@ -318,7 +403,6 @@ public class SeedService {
                 conn.commit();
             }
         }
-        LOG.info("[SEED] Dados mestres reinseridos.");
     }
 
     // =====================================================================

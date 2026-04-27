@@ -1,7 +1,5 @@
 package com.example.resource;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.Map;
 
 import org.eclipse.microprofile.context.ManagedExecutor;
@@ -12,12 +10,10 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.logging.Logger;
 
-import com.example.service.SeedIndividualService;
 import com.example.service.SeedService;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -32,6 +28,9 @@ import jakarta.ws.rs.core.Response;
  *
  * POST /admin/seed?quantidade=35000000&limpar=true  → 202 Accepted (execução assíncrona)
  * POST /admin/seed/remessas                         → 202 Accepted (só remessas, não apaga operações)
+ * POST /admin/seed/tipos?limpar=true                → script de seed de tipos de programa
+ * POST /admin/seed/fundos?limpar=true               → script de seed de fundos garantidores
+ * POST /admin/seed/agentes?limpar=true              → script de seed de agentes financeiros
  * GET  /admin/seed/status                           → JSON com progresso atual
  */
 @Path("/admin/seed")
@@ -49,6 +48,9 @@ import jakarta.ws.rs.core.Response;
           Perda total dos 100M de registros de operações. Levará algumas horas para inserir os 100 milhões de registros.
         - `POST /admin/seed/remessas` — Apaga e recria APENAS a tabela de remessas.
           Operações (OPR_CRD_FNDO_GRTR) são preservadas.
+        - `POST /admin/seed/tipos` — Popula TIP_PGM_CRD com os tipos de programa padrão.
+        - `POST /admin/seed/fundos` — Popula FNDO_GRTR com os fundos garantidores padrão.
+        - `POST /admin/seed/agentes` — Popula AGT_FNCO e associações com os agentes financeiros padrão.
         - `GET /admin/seed/status` — Somente leitura. Seguro.
         """
 )
@@ -58,9 +60,6 @@ public class SeedResource {
 
     @Inject
     SeedService seedService;
-
-    @Inject
-    SeedIndividualService individual;
 
     @Inject
     ManagedExecutor executor;
@@ -214,247 +213,102 @@ public class SeedResource {
     }
 
     // =========================================================================
-    // INSERTS INDIVIDUAIS — inserção unitária por tabela
+    // SCRIPTS DE SEED — sem body, dados embutidos no serviço
     // =========================================================================
 
     @POST
-    @Path("/agente")
-    @Consumes(MediaType.APPLICATION_JSON)
+    @Path("/tipos")
     @Operation(
-        summary = "Insere um agente financeiro",
+        summary = "Script — popula tipos de programa (TIP_PGM_CRD)",
         description = """
-            Insere uma linha em `AGT_FNCO` e cria a associação em `AGT_FNCO_FNDO_GRTR`
-            para cada fundo já existente no banco.
+            Executa o script de seed de tipos de programa.
 
-            **Campos obrigatórios:** `codAgente`, `nome`
+            Com `limpar=true` (padrão): apaga os registros existentes antes de inserir.
+            Com `limpar=false`: insere sem apagar (pode falhar em chave duplicada se já existirem).
 
-            **Campos opcionais:**
-            - `ispb` — ISPB de 8 dígitos (padrão `"00000000"`)
-            - `codCli` — código do cliente interno (padrão `1000 + codAgente`)
-
-            **Exemplo de body:**
-            ```json
-            { "codAgente": 8, "nome": "BANCO XYZ SA", "ispb": "30306294" }
-            ```
+            Os dados inseridos são os tipos padrão do sistema.
             """
     )
     @APIResponses({
-        @APIResponse(responseCode = "201", description = "Agente inserido"),
-        @APIResponse(responseCode = "400", description = "Campos obrigatórios ausentes"),
-        @APIResponse(responseCode = "500", description = "Erro no DB2 (ex: chave duplicada)")
+        @APIResponse(responseCode = "200", description = "Script executado com sucesso"),
+        @APIResponse(responseCode = "500", description = "Erro durante execução do script")
     })
-    public Response inserirAgente(Map<String, Object> body) {
-        Object codObj  = body.get("codAgente");
-        Object nomeObj = body.get("nome");
-        if (codObj == null || nomeObj == null) {
-            return Response.status(400).entity(Map.of("erro", "codAgente e nome são obrigatórios")).build();
-        }
-        int    codAgente = ((Number) codObj).intValue();
-        String nome      = nomeObj.toString();
-        String ispb      = body.getOrDefault("ispb",   "").toString();
-        Object codCliObj = body.get("codCli");
-        Integer codCli   = codCliObj != null ? ((Number) codCliObj).intValue() : null;
+    public Response seedTipos(
+            @Parameter(description = "true = apaga antes de inserir")
+            @QueryParam("limpar") @DefaultValue("true") boolean limpar) {
         try {
-            individual.inserirAgente(codAgente, nome, ispb, codCli);
-            return Response.status(201).entity(Map.of(
-                    "mensagem",   "Agente inserido com sucesso",
-                    "codAgente",  codAgente,
-                    "nome",       nome
+            seedService.seedTipos(limpar);
+            return Response.ok(Map.of(
+                    "mensagem", "Tipos de programa populados com sucesso",
+                    "limpar",   limpar
             )).build();
         } catch (Exception e) {
-            LOG.errorf(e, "[SEED-IND] Falha ao inserir agente %d", codAgente);
+            LOG.errorf(e, "[SEED] Falha ao popular tipos");
             return Response.serverError().entity(Map.of("erro", e.getMessage())).build();
         }
     }
 
     @POST
-    @Path("/fundo")
-    @Consumes(MediaType.APPLICATION_JSON)
+    @Path("/fundos")
     @Operation(
-        summary = "Insere um fundo garantidor",
+        summary = "Script — popula fundos garantidores (FNDO_GRTR)",
         description = """
-            Insere uma linha em `FNDO_GRTR` e cria a associação em `AGT_FNCO_FNDO_GRTR`
-            para cada agente já existente no banco.
+            Executa o script de seed de fundos garantidores.
 
-            **Campos obrigatórios:** `codFundo`, `sigla`, `nome`
+            Com `limpar=true` (padrão): apaga os registros existentes antes de inserir.
+            Com `limpar=false`: insere sem apagar (pode falhar em chave duplicada se já existirem).
 
-            **Exemplo de body:**
-            ```json
-            { "codFundo": 3, "sigla": "FGR", "nome": "Fundo de Garantia Rural" }
-            ```
+            Os fundos inseridos são os padrão do sistema (ex: FGO, FAMPE).
             """
     )
     @APIResponses({
-        @APIResponse(responseCode = "201", description = "Fundo inserido"),
-        @APIResponse(responseCode = "400", description = "Campos obrigatórios ausentes"),
-        @APIResponse(responseCode = "500", description = "Erro no DB2")
+        @APIResponse(responseCode = "200", description = "Script executado com sucesso"),
+        @APIResponse(responseCode = "500", description = "Erro durante execução do script")
     })
-    public Response inserirFundo(Map<String, Object> body) {
-        Object codObj   = body.get("codFundo");
-        Object siglaObj = body.get("sigla");
-        Object nomeObj  = body.get("nome");
-        if (codObj == null || siglaObj == null || nomeObj == null) {
-            return Response.status(400).entity(Map.of("erro", "codFundo, sigla e nome são obrigatórios")).build();
-        }
-        int    codFundo = ((Number) codObj).intValue();
-        String sigla    = siglaObj.toString();
-        String nome     = nomeObj.toString();
+    public Response seedFundos(
+            @Parameter(description = "true = apaga antes de inserir")
+            @QueryParam("limpar") @DefaultValue("true") boolean limpar) {
         try {
-            individual.inserirFundo(codFundo, sigla, nome);
-            return Response.status(201).entity(Map.of(
-                    "mensagem",  "Fundo inserido com sucesso",
-                    "codFundo",  codFundo,
-                    "sigla",     sigla
+            seedService.seedFundos(limpar);
+            return Response.ok(Map.of(
+                    "mensagem", "Fundos garantidores populados com sucesso",
+                    "limpar",   limpar
             )).build();
         } catch (Exception e) {
-            LOG.errorf(e, "[SEED-IND] Falha ao inserir fundo %d", codFundo);
+            LOG.errorf(e, "[SEED] Falha ao popular fundos");
             return Response.serverError().entity(Map.of("erro", e.getMessage())).build();
         }
     }
 
     @POST
-    @Path("/programa")
-    @Consumes(MediaType.APPLICATION_JSON)
+    @Path("/agentes")
     @Operation(
-        summary = "Insere um programa de crédito",
+        summary = "Script — popula agentes financeiros (AGT_FNCO)",
         description = """
-            Insere uma linha em `TIP_PGM_CRD`.
+            Executa o script de seed de agentes financeiros.
 
-            **Campos obrigatórios:** `codPrograma`, `nome`
+            Com `limpar=true` (padrão): apaga os registros existentes antes de inserir
+            (inclusive as associações em AGT_FNCO_FNDO_GRTR).
+            Com `limpar=false`: insere sem apagar (pode falhar em chave duplicada se já existirem).
 
-            **Exemplo de body:**
-            ```json
-            { "codPrograma": 7, "nome": "Novo Programa Emergencial" }
-            ```
+            Os agentes inseridos são os 40 agentes padrão do sistema.
             """
     )
     @APIResponses({
-        @APIResponse(responseCode = "201", description = "Programa inserido"),
-        @APIResponse(responseCode = "400", description = "Campos obrigatórios ausentes"),
-        @APIResponse(responseCode = "500", description = "Erro no DB2")
+        @APIResponse(responseCode = "200", description = "Script executado com sucesso"),
+        @APIResponse(responseCode = "500", description = "Erro durante execução do script")
     })
-    public Response inserirPrograma(Map<String, Object> body) {
-        Object codObj  = body.get("codPrograma");
-        Object nomeObj = body.get("nome");
-        if (codObj == null || nomeObj == null) {
-            return Response.status(400).entity(Map.of("erro", "codPrograma e nome são obrigatórios")).build();
-        }
-        int    codPrograma = ((Number) codObj).intValue();
-        String nome        = nomeObj.toString();
+    public Response seedAgentes(
+            @Parameter(description = "true = apaga antes de inserir")
+            @QueryParam("limpar") @DefaultValue("true") boolean limpar) {
         try {
-            individual.inserirPrograma(codPrograma, nome);
-            return Response.status(201).entity(Map.of(
-                    "mensagem",    "Programa inserido com sucesso",
-                    "codPrograma", codPrograma,
-                    "nome",        nome
+            seedService.seedAgentes(limpar);
+            return Response.ok(Map.of(
+                    "mensagem", "Agentes financeiros populados com sucesso",
+                    "limpar",   limpar
             )).build();
         } catch (Exception e) {
-            LOG.errorf(e, "[SEED-IND] Falha ao inserir programa %d", codPrograma);
-            return Response.serverError().entity(Map.of("erro", e.getMessage())).build();
-        }
-    }
-
-    @POST
-    @Path("/operacao")
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Operation(
-        summary = "Insere uma operação de crédito individual",
-        description = """
-            Insere uma linha em `OPR_CRD_FNDO_GRTR`. O ID é gerado automaticamente
-            (MAX + 1). Campos não informados recebem valores sintéticos aleatórios.
-
-            **Campos obrigatórios:** `codAgente`
-
-            **Campos opcionais:**
-            - `codFundo` — padrão `1`
-            - `codPrograma` — padrão aleatório (1-6)
-            - `vlrOperacao` — valor em R$ (padrão aleatório 10k-2M)
-            - `dataFormalizacao` — formato `YYYY-MM-DD` (padrão hoje)
-            - `tipoPessoa` — 1=PF, 2=PJ, 3=Rural (padrão 1)
-            - `cpfCnpj` — número sem formatação (padrão aleatório)
-
-            **Exemplo de body:**
-            ```json
-            { "codAgente": 1, "codFundo": 1, "vlrOperacao": 500000.00,
-              "dataFormalizacao": "2026-04-01", "tipoPessoa": 2 }
-            ```
-            """
-    )
-    @APIResponses({
-        @APIResponse(responseCode = "201", description = "Operação inserida"),
-        @APIResponse(responseCode = "400", description = "codAgente ausente"),
-        @APIResponse(responseCode = "500", description = "Erro no DB2 (ex: FK inválida)")
-    })
-    public Response inserirOperacao(Map<String, Object> body) {
-        Object codAgtObj = body.get("codAgente");
-        if (codAgtObj == null) {
-            return Response.status(400).entity(Map.of("erro", "codAgente é obrigatório")).build();
-        }
-        int     codAgente        = ((Number) codAgtObj).intValue();
-        Integer codFundo         = body.get("codFundo")         != null ? ((Number) body.get("codFundo")).intValue()         : null;
-        Integer codPrograma      = body.get("codPrograma")      != null ? ((Number) body.get("codPrograma")).intValue()      : null;
-        Integer tipoPessoa       = body.get("tipoPessoa")       != null ? ((Number) body.get("tipoPessoa")).intValue()       : null;
-        BigDecimal vlrOperacao   = body.get("vlrOperacao")      != null ? new BigDecimal(body.get("vlrOperacao").toString()) : null;
-        BigDecimal cpfCnpj       = body.get("cpfCnpj")          != null ? new BigDecimal(body.get("cpfCnpj").toString())     : null;
-        LocalDate  dtFrmz        = body.get("dataFormalizacao") != null ? LocalDate.parse(body.get("dataFormalizacao").toString()) : null;
-        try {
-            long id = individual.inserirOperacao(codAgente, codFundo, codPrograma, vlrOperacao, dtFrmz, tipoPessoa, cpfCnpj);
-            return Response.status(201).entity(Map.of(
-                    "mensagem",   "Operação inserida com sucesso",
-                    "id",         id,
-                    "codAgente",  codAgente
-            )).build();
-        } catch (Exception e) {
-            LOG.errorf(e, "[SEED-IND] Falha ao inserir operação (agente=%d)", codAgente);
-            return Response.serverError().entity(Map.of("erro", e.getMessage())).build();
-        }
-    }
-
-    @POST
-    @Path("/remessa")
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Operation(
-        summary = "Insere uma remessa individual",
-        description = """
-            Insere uma linha em `RMS_AGT_FNCO` com status `Recebida`. O ID é gerado
-            automaticamente (MAX + 1).
-
-            **Campos obrigatórios:** `codAgente`
-
-            **Campos opcionais:**
-            - `codFundo` — padrão `1`
-            - `data` — formato `YYYY-MM-DD` (padrão hoje)
-            - `qtdReg` — quantidade de registros no lote (padrão aleatório 10k-50k)
-
-            **Exemplo de body:**
-            ```json
-            { "codAgente": 1, "codFundo": 2, "data": "2026-04-20", "qtdReg": 25000 }
-            ```
-            """
-    )
-    @APIResponses({
-        @APIResponse(responseCode = "201", description = "Remessa inserida"),
-        @APIResponse(responseCode = "400", description = "codAgente ausente"),
-        @APIResponse(responseCode = "500", description = "Erro no DB2")
-    })
-    public Response inserirRemessa(Map<String, Object> body) {
-        Object codAgtObj = body.get("codAgente");
-        if (codAgtObj == null) {
-            return Response.status(400).entity(Map.of("erro", "codAgente é obrigatório")).build();
-        }
-        int       codAgente = ((Number) codAgtObj).intValue();
-        Integer   codFundo  = body.get("codFundo") != null ? ((Number) body.get("codFundo")).intValue() : null;
-        Integer   qtdReg    = body.get("qtdReg")   != null ? ((Number) body.get("qtdReg")).intValue()   : null;
-        LocalDate data      = body.get("data")      != null ? LocalDate.parse(body.get("data").toString()) : null;
-        try {
-            long id = individual.inserirRemessa(codAgente, codFundo, data, qtdReg);
-            return Response.status(201).entity(Map.of(
-                    "mensagem",  "Remessa inserida com sucesso",
-                    "id",        id,
-                    "codAgente", codAgente
-            )).build();
-        } catch (Exception e) {
-            LOG.errorf(e, "[SEED-IND] Falha ao inserir remessa (agente=%d)", codAgente);
+            LOG.errorf(e, "[SEED] Falha ao popular agentes");
             return Response.serverError().entity(Map.of("erro", e.getMessage())).build();
         }
     }
