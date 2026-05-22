@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>N0 — Contexto · Painel Agentes FGO</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f4f8; }
+  header { background: #1a3a5c; color: #fff; padding: 18px 32px; display: flex; align-items: center; gap: 16px; }
+  header a { color: #a8c0d8; font-size: 13px; text-decoration: none; }
+  header a:hover { color: #fff; }
+  header h1 { font-size: 18px; }
+  .canvas { width: 100%; max-width: 1000px; margin: 40px auto; display: block; }
+  .note { max-width: 1000px; margin: 0 auto 40px; background: #fff; border: 1px solid #dde3ed; border-radius: 8px; padding: 20px 28px; font-size: 13px; color: #444; line-height: 1.7; }
+  .note h3 { font-size: 14px; color: #1a3a5c; margin-bottom: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  td, th { padding: 7px 12px; border-bottom: 1px solid #eee; text-align: left; }
+  th { font-weight: 600; color: #555; background: #f8fafc; }
+</style>
+</head>
+<body>
+<header>
+  <a href="index.html">← Voltar</a>
+  <h1>N0 — Diagrama de Contexto</h1>
+</header>
+
+<svg class="canvas" viewBox="0 0 960 620" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, system-ui, sans-serif">
+  <!-- Fundo -->
+  <rect width="960" height="620" fill="#f0f4f8"/>
+
+  <!-- Título -->
+  <text x="480" y="32" text-anchor="middle" font-size="16" font-weight="700" fill="#1a3a5c">N0 — Contexto do Sistema · Painel Agentes FGO</text>
+
+  <!-- ===== USUÁRIO ===== -->
+  <g transform="translate(60,100)">
+    <circle cx="50" cy="30" r="22" fill="#e8f0fb" stroke="#1a5cb5" stroke-width="2"/>
+    <circle cx="50" cy="12" r="10" fill="#1a5cb5"/>
+    <path d="M28,52 Q50,38 72,52" fill="#1a5cb5"/>
+    <text x="50" y="70" text-anchor="middle" font-size="12" font-weight="700" fill="#1a3a5c">Agente Financeiro</text>
+    <text x="50" y="84" text-anchor="middle" font-size="11" fill="#555">(usuário interno BB)</text>
+  </g>
+
+  <!-- ===== ANGULAR SPA ===== -->
+  <g transform="translate(240,80)">
+    <rect x="0" y="0" width="150" height="80" rx="8" fill="#e8f4e8" stroke="#217a21" stroke-width="2"/>
+    <text x="75" y="25" text-anchor="middle" font-size="12" font-weight="700" fill="#1a3a5c">Angular SPA</text>
+    <text x="75" y="42" text-anchor="middle" font-size="11" fill="#555">Painel do Agente</text>
+    <text x="75" y="57" text-anchor="middle" font-size="11" fill="#555">FGO (frontend)</text>
+    <text x="75" y="72" text-anchor="middle" font-size="10" fill="#888">[Browser / HTTPS]</text>
+  </g>
+
+  <!-- ===== IIB / API GATEWAY ===== -->
+  <g transform="translate(460,80)">
+    <rect x="0" y="0" width="150" height="80" rx="8" fill="#fff8e1" stroke="#f0a500" stroke-width="2"/>
+    <text x="75" y="25" text-anchor="middle" font-size="12" font-weight="700" fill="#1a3a5c">IIB Gateway</text>
+    <text x="75" y="42" text-anchor="middle" font-size="11" fill="#555">API Gateway BB</text>
+    <text x="75" y="57" text-anchor="middle" font-size="11" fill="#555">Auth · Roteamento</text>
+    <text x="75" y="72" text-anchor="middle" font-size="10" fill="#888">[REST / JWT]</text>
+  </g>
+
+  <!-- ===== MS PAINEL FGO (SISTEMA PRINCIPAL) ===== -->
+  <g transform="translate(240,260)">
+    <rect x="0" y="0" width="370" height="140" rx="10" fill="#1a3a5c" stroke="#0d2640" stroke-width="3"/>
+    <rect x="8" y="8" width="354" height="124" rx="7" fill="#1e4470" stroke="none"/>
+    <text x="185" y="34" text-anchor="middle" font-size="14" font-weight="800" fill="#fff">MS Painel FGO</text>
+    <text x="185" y="52" text-anchor="middle" font-size="11" fill="#a8c0d8">Quarkus 3.x · JVM 17</text>
+    <text x="185" y="72" text-anchor="middle" font-size="11" fill="#c8d8e8">22 endpoints REST · /api/v1/...</text>
+    <text x="185" y="90" text-anchor="middle" font-size="11" fill="#c8d8e8">Queries nativas DB2 (BI-exatas)</text>
+    <text x="185" y="108" text-anchor="middle" font-size="11" fill="#c8d8e8">OpenShift pod · Redis cache</text>
+    <text x="185" y="126" text-anchor="middle" font-size="11" fill="#a8c0d8">[Java · JAX-RS · Hibernate ORM]</text>
+  </g>
+
+  <!-- ===== REDIS SENTINEL ===== -->
+  <g transform="translate(680,240)">
+    <rect x="0" y="0" width="150" height="90" rx="8" fill="#fce8e8" stroke="#c0392b" stroke-width="2"/>
+    <text x="75" y="24" text-anchor="middle" font-size="12" font-weight="700" fill="#1a3a5c">Redis Sentinel</text>
+    <text x="75" y="41" text-anchor="middle" font-size="11" fill="#555">1 master + 2 réplicas</text>
+    <text x="75" y="57" text-anchor="middle" font-size="11" fill="#555">3 sentinels · TTL 25h</text>
+    <text x="75" y="73" text-anchor="middle" font-size="11" fill="#555">Cache KPIs warm-up</text>
+    <text x="75" y="88" text-anchor="middle" font-size="10" fill="#888">[Redis 7 · Resp 2]</text>
+  </g>
+
+  <!-- ===== IBM DB2 ===== -->
+  <g transform="translate(60,370)">
+    <rect x="0" y="0" width="160" height="110" rx="8" fill="#f3e8fb" stroke="#6c3483" stroke-width="2"/>
+    <text x="80" y="24" text-anchor="middle" font-size="12" font-weight="700" fill="#1a3a5c">IBM DB2</text>
+    <text x="80" y="41" text-anchor="middle" font-size="11" fill="#555">DB2GFG (transacional)</text>
+    <text x="80" y="57" text-anchor="middle" font-size="11" fill="#6c3483">RMS_AGT_FNCO</text>
+    <text x="80" y="72" text-anchor="middle" font-size="11" fill="#6c3483">AGT_FNCO · FNDO_GRTR</text>
+    <text x="80" y="87" text-anchor="middle" font-size="11" fill="#6c3483">TIP_* lookup tables</text>
+    <text x="80" y="102" text-anchor="middle" font-size="10" fill="#888">[JDBC · DB2 12.1]</text>
+  </g>
+
+  <!-- ===== IBM DB2 DW ===== -->
+  <g transform="translate(260,430)">
+    <rect x="0" y="0" width="160" height="100" rx="8" fill="#e8f0fb" stroke="#1a5cb5" stroke-width="2"/>
+    <text x="80" y="24" text-anchor="middle" font-size="12" font-weight="700" fill="#1a3a5c">IBM DB2 DW</text>
+    <text x="80" y="41" text-anchor="middle" font-size="11" fill="#555">DB2D4W (analytics)</text>
+    <text x="80" y="57" text-anchor="middle" font-size="11" fill="#1a5cb5">CTRA_FNDO_GRTR</text>
+    <text x="80" y="72" text-anchor="middle" font-size="11" fill="#1a5cb5">DETT_OPR_PND</text>
+    <text x="80" y="87" text-anchor="middle" font-size="11" fill="#555">Snapshots pré-computados</text>
+    <text x="80" y="102" text-anchor="middle" font-size="10" fill="#888">[Atualização diária]</text>
+  </g>
+
+  <!-- ===== OPENSHIFT ===== -->
+  <g transform="translate(700,430)">
+    <rect x="0" y="0" width="150" height="90" rx="8" fill="#fef9e7" stroke="#d4ac0d" stroke-width="2"/>
+    <text x="75" y="24" text-anchor="middle" font-size="12" font-weight="700" fill="#1a3a5c">OpenShift</text>
+    <text x="75" y="41" text-anchor="middle" font-size="11" fill="#555">CRC / OCP 4.18</text>
+    <text x="75" y="57" text-anchor="middle" font-size="11" fill="#555">Pod deployment</text>
+    <text x="75" y="73" text-anchor="middle" font-size="11" fill="#555">CI/CD GitHub Actions</text>
+    <text x="75" y="87" text-anchor="middle" font-size="10" fill="#888">[RHEL 9 server]</text>
+  </g>
+
+  <!-- ===== SETAS ===== -->
+  <!-- Usuário → Angular -->
+  <line x1="160" y1="130" x2="240" y2="120" stroke="#555" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="195" y="113" font-size="10" fill="#555" text-anchor="middle">HTTPS</text>
+
+  <!-- Angular → IIB -->
+  <line x1="390" y1="120" x2="460" y2="120" stroke="#555" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="425" y="113" font-size="10" fill="#555" text-anchor="middle">REST</text>
+
+  <!-- IIB → MS FGO -->
+  <line x1="535" y1="160" x2="490" y2="260" stroke="#555" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="525" y="215" font-size="10" fill="#555">REST/JSON</text>
+
+  <!-- MS FGO → Redis -->
+  <line x1="610" y1="320" x2="680" y2="295" stroke="#c0392b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrR)"/>
+  <text x="650" y="313" font-size="10" fill="#c0392b">cache</text>
+
+  <!-- MS FGO → DB2GFG -->
+  <line x1="280" y1="400" x2="185" y2="370" stroke="#6c3483" stroke-width="1.5" marker-end="url(#arrP)"/>
+  <text x="210" y="382" font-size="10" fill="#6c3483">JDBC</text>
+
+  <!-- MS FGO → DB2D4W -->
+  <line x1="360" y1="400" x2="360" y2="430" stroke="#1a5cb5" stroke-width="1.5" marker-end="url(#arrB)"/>
+  <text x="365" y="420" font-size="10" fill="#1a5cb5">JDBC</text>
+
+  <!-- MS FGO → OpenShift (hospedado em) -->
+  <line x1="610" y1="370" x2="700" y2="450" stroke="#d4ac0d" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrO)"/>
+  <text x="665" y="407" font-size="10" fill="#d4ac0d">hosted in</text>
+
+  <!-- Definição das setas -->
+  <defs>
+    <marker id="arr"  markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#555"/></marker>
+    <marker id="arrR" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#c0392b"/></marker>
+    <marker id="arrP" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#6c3483"/></marker>
+    <marker id="arrB" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#1a5cb5"/></marker>
+    <marker id="arrO" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#d4ac0d"/></marker>
+  </defs>
+</svg>
+
+<div class="note">
+  <h3>Legenda</h3>
+  <table>
+    <thead><tr><th>Elemento</th><th>Tipo</th><th>Responsabilidade</th></tr></thead>
+    <tbody>
+      <tr><td>Agente Financeiro</td><td>Usuário</td><td>Acessa o painel via browser para acompanhar carteira FGO</td></tr>
+      <tr><td>Angular SPA</td><td>Container</td><td>Interface do usuário — consome os 22 endpoints REST /api/v1/...</td></tr>
+      <tr><td>IIB Gateway</td><td>Sistema externo</td><td>API Gateway do BB: autenticação JWT, roteamento, throttling</td></tr>
+      <tr><td>MS Painel FGO</td><td>Sistema principal</td><td>22 endpoints REST, queries nativas DB2 (BI-exatas), cache Redis</td></tr>
+      <tr><td>Redis Sentinel</td><td>Container</td><td>Cache distribuído de KPIs — warm-up diário 07:20, TTL 25h</td></tr>
+      <tr><td>IBM DB2 (DB2GFG)</td><td>Sistema externo</td><td>Schema transacional — remessas, agentes, fundos, programas</td></tr>
+      <tr><td>IBM DB2 (DB2D4W)</td><td>Sistema externo</td><td>Schema analytics — snapshots de operações e pendências pré-computados</td></tr>
+      <tr><td>OpenShift</td><td>Plataforma</td><td>Orquestração do pod, CI/CD via GitHub Actions self-hosted</td></tr>
+    </tbody>
+  </table>
+</div>
+</body>
+</html>

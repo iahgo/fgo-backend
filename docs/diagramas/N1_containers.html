@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>N1 — Containers · Painel Agentes FGO</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f4f8; }
+  header { background: #1a3a5c; color: #fff; padding: 18px 32px; display: flex; align-items: center; gap: 16px; }
+  header a { color: #a8c0d8; font-size: 13px; text-decoration: none; }
+  header h1 { font-size: 18px; }
+  .canvas { width: 100%; max-width: 1100px; margin: 40px auto; display: block; }
+  .note { max-width: 1100px; margin: 0 auto 40px; background: #fff; border: 1px solid #dde3ed; border-radius: 8px; padding: 20px 28px; font-size: 13px; color: #444; line-height: 1.7; }
+  .note h3 { font-size: 14px; color: #1a3a5c; margin-bottom: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  td, th { padding: 7px 12px; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
+  th { font-weight: 600; color: #555; background: #f8fafc; }
+</style>
+</head>
+<body>
+<header>
+  <a href="index.html">← Voltar</a>
+  <h1>N1 — Diagrama de Containers</h1>
+</header>
+
+<svg class="canvas" viewBox="0 0 1060 700" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, system-ui, sans-serif">
+  <rect width="1060" height="700" fill="#f0f4f8"/>
+  <text x="530" y="30" text-anchor="middle" font-size="16" font-weight="700" fill="#1a3a5c">N1 — Containers · Painel Agentes FGO</text>
+
+  <!-- ─── BOUNDARY: MS Painel FGO (OpenShift pod) ─── -->
+  <rect x="290" y="50" width="560" height="430" rx="12" fill="none" stroke="#1a3a5c" stroke-width="2" stroke-dasharray="8,4"/>
+  <text x="570" y="72" text-anchor="middle" font-size="12" fill="#1a3a5c" font-weight="600">[OpenShift Pod] MS Painel FGO</text>
+
+  <!-- JAX-RS Layer -->
+  <rect x="310" y="85" width="520" height="75" rx="8" fill="#e8f0fb" stroke="#1a5cb5" stroke-width="1.5"/>
+  <text x="570" y="108" text-anchor="middle" font-size="12" font-weight="700" fill="#1a3a5c">JAX-RS Resources (22 endpoints)</text>
+  <text x="570" y="126" text-anchor="middle" font-size="11" fill="#444">/api/v1/fundos · /programas · /painel/* · /operacoes · /remessas · /movimentacoes · /pendencias</text>
+  <text x="570" y="144" text-anchor="middle" font-size="10" fill="#888">Quarkus RESTEasy Reactive · SmallRye OpenAPI (Swagger)</text>
+
+  <!-- Service Layer -->
+  <rect x="310" y="175" width="520" height="65" rx="8" fill="#e8f4e8" stroke="#217a21" stroke-width="1.5"/>
+  <text x="570" y="198" text-anchor="middle" font-size="12" font-weight="700" fill="#1a3a5c">Service Layer</text>
+  <text x="570" y="215" text-anchor="middle" font-size="11" fill="#444">PainelService · OperacaoListagemService · RemessaListagemService · MovimentacaoService · PendenciaService</text>
+  <text x="570" y="230" text-anchor="middle" font-size="10" fill="#888">Mapeamento Object[] → DTO · Cálculos (IVH, inadimplência) · Paginação</text>
+
+  <!-- Repository Layer -->
+  <rect x="310" y="255" width="520" height="65" rx="8" fill="#fff8e1" stroke="#f0a500" stroke-width="1.5"/>
+  <text x="570" y="278" text-anchor="middle" font-size="12" font-weight="700" fill="#1a3a5c">Repository Layer (Native SQL)</text>
+  <text x="570" y="295" text-anchor="middle" font-size="11" fill="#444">PainelRepository · OperacaoListagemRepository · RemessaListagemRepository · MovimentacaoRepository · PendenciaRepository</text>
+  <text x="570" y="310" text-anchor="middle" font-size="10" fill="#888">Queries BI-exatas via EntityManager.createNativeQuery() · Positional params ?</text>
+
+  <!-- Warm-up Scheduler -->
+  <rect x="310" y="335" width="245" height="60" rx="8" fill="#fce8e8" stroke="#c0392b" stroke-width="1.5"/>
+  <text x="432" y="358" text-anchor="middle" font-size="12" font-weight="700" fill="#1a3a5c">Warm-up Scheduler</text>
+  <text x="432" y="374" text-anchor="middle" font-size="11" fill="#444">OperacaoLoader · 07:20 diário</text>
+  <text x="432" y="388" text-anchor="middle" font-size="10" fill="#888">Redis SET NX lock distribuído</text>
+
+  <!-- Health / Observability -->
+  <rect x="580" y="335" width="250" height="60" rx="8" fill="#f3e8fb" stroke="#6c3483" stroke-width="1.5"/>
+  <text x="705" y="358" text-anchor="middle" font-size="12" font-weight="700" fill="#1a3a5c">Observabilidade</text>
+  <text x="705" y="374" text-anchor="middle" font-size="11" fill="#444">Health · Métricas · LogBuffer</text>
+  <text x="705" y="388" text-anchor="middle" font-size="10" fill="#888">/q/health · /admin/sistema · /admin/logs</text>
+
+  <!-- Seta: Resources → Services -->
+  <line x1="570" y1="160" x2="570" y2="175" stroke="#1a5cb5" stroke-width="1.5" marker-end="url(#a1)"/>
+  <!-- Seta: Services → Repositories -->
+  <line x1="570" y1="240" x2="570" y2="255" stroke="#217a21" stroke-width="1.5" marker-end="url(#a2)"/>
+
+  <!-- ─── REDIS ─── -->
+  <rect x="30" y="170" width="200" height="150" rx="10" fill="#fce8e8" stroke="#c0392b" stroke-width="2"/>
+  <text x="130" y="198" text-anchor="middle" font-size="13" font-weight="700" fill="#1a3a5c">Redis Sentinel</text>
+  <text x="130" y="218" text-anchor="middle" font-size="11" fill="#555">Redis 7</text>
+  <text x="130" y="235" text-anchor="middle" font-size="11" fill="#555">1 master + 2 réplicas</text>
+  <text x="130" y="252" text-anchor="middle" font-size="11" fill="#555">3 sentinels</text>
+  <text x="130" y="270" text-anchor="middle" font-size="11" fill="#555">TTL 25h por chave</text>
+  <text x="130" y="288" text-anchor="middle" font-size="10" fill="#888">Porta: 26379 (sentinel)</text>
+  <text x="130" y="305" text-anchor="middle" font-size="10" fill="#888">~2–5 MB cache total</text>
+
+  <!-- ─── DB2GFG ─── -->
+  <rect x="30" y="380" width="200" height="160" rx="10" fill="#f3e8fb" stroke="#6c3483" stroke-width="2"/>
+  <text x="130" y="406" text-anchor="middle" font-size="13" font-weight="700" fill="#1a3a5c">DB2GFG</text>
+  <text x="130" y="424" text-anchor="middle" font-size="11" fill="#6c3483">Transacional</text>
+  <text x="130" y="442" text-anchor="middle" font-size="11" fill="#555">RMS_AGT_FNCO</text>
+  <text x="130" y="459" text-anchor="middle" font-size="11" fill="#555">RSM_MVTC_FNCR_RMS</text>
+  <text x="130" y="476" text-anchor="middle" font-size="11" fill="#555">EVT_OPR_R3TD</text>
+  <text x="130" y="493" text-anchor="middle" font-size="11" fill="#555">AGT_FNCO · FNDO_GRTR</text>
+  <text x="130" y="510" text-anchor="middle" font-size="11" fill="#555">TIP_PGM_CRD · TIP_*</text>
+  <text x="130" y="528" text-anchor="middle" font-size="10" fill="#888">IBM DB2 12.1 · JDBC</text>
+
+  <!-- ─── DB2D4W ─── -->
+  <rect x="830" y="380" width="200" height="140" rx="10" fill="#e8f0fb" stroke="#1a5cb5" stroke-width="2"/>
+  <text x="930" y="406" text-anchor="middle" font-size="13" font-weight="700" fill="#1a3a5c">DB2D4W</text>
+  <text x="930" y="424" text-anchor="middle" font-size="11" fill="#1a5cb5">Analytics / DW</text>
+  <text x="930" y="442" text-anchor="middle" font-size="11" fill="#555">CTRA_FNDO_GRTR</text>
+  <text x="930" y="459" text-anchor="middle" font-size="11" fill="#888">(snapshot DT_REF=MAX)</text>
+  <text x="930" y="477" text-anchor="middle" font-size="11" fill="#555">DETT_OPR_PND</text>
+  <text x="930" y="494" text-anchor="middle" font-size="11" fill="#888">(pendências pré-computadas)</text>
+  <text x="930" y="512" text-anchor="middle" font-size="10" fill="#888">Atualizado diariamente</text>
+
+  <!-- ─── ANGULAR ─── -->
+  <rect x="830" y="170" width="200" height="150" rx="10" fill="#e8f4e8" stroke="#217a21" stroke-width="2"/>
+  <text x="930" y="198" text-anchor="middle" font-size="13" font-weight="700" fill="#1a3a5c">Angular SPA</text>
+  <text x="930" y="218" text-anchor="middle" font-size="11" fill="#555">Angular 17+</text>
+  <text x="930" y="235" text-anchor="middle" font-size="11" fill="#555">Painel do Agente FGO</text>
+  <text x="930" y="252" text-anchor="middle" font-size="11" fill="#555">Gráficos · Tabelas</text>
+  <text x="930" y="270" text-anchor="middle" font-size="11" fill="#555">Exportar CSV</text>
+  <text x="930" y="290" text-anchor="middle" font-size="10" fill="#888">via IIB → /api/v1/*</text>
+  <text x="930" y="308" text-anchor="middle" font-size="10" fill="#888">HTTP · JSON</text>
+
+  <!-- Setas externas -->
+  <!-- Warm-up → Redis -->
+  <line x1="310" y1="365" x2="230" y2="290" stroke="#c0392b" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#aR)"/>
+  <text x="260" y="320" font-size="10" fill="#c0392b" transform="rotate(-30,260,320)">SET/GET</text>
+  <!-- Repositories → DB2GFG -->
+  <line x1="400" y1="400" x2="230" y2="450" stroke="#6c3483" stroke-width="1.5" marker-end="url(#aP)"/>
+  <text x="295" y="440" font-size="10" fill="#6c3483">JDBC</text>
+  <!-- Repositories → DB2D4W -->
+  <line x1="730" y1="400" x2="830" y2="450" stroke="#1a5cb5" stroke-width="1.5" marker-end="url(#aB)"/>
+  <text x="765" y="440" font-size="10" fill="#1a5cb5">JDBC</text>
+  <!-- Angular → Resources -->
+  <line x1="830" y1="240" x2="830" y2="130" stroke="#217a21" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <line x1="830" y1="130" x2="830" y2="120" stroke="#217a21" stroke-width="1.5" marker-end="url(#a2)"/>
+
+  <defs>
+    <marker id="a1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#1a5cb5"/></marker>
+    <marker id="a2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#217a21"/></marker>
+    <marker id="aR" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#c0392b"/></marker>
+    <marker id="aP" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#6c3483"/></marker>
+    <marker id="aB" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#1a5cb5"/></marker>
+  </defs>
+
+  <!-- Legenda schema boundary -->
+  <rect x="30" y="560" width="16" height="16" fill="none" stroke="#1a3a5c" stroke-width="2" stroke-dasharray="6,3"/>
+  <text x="52" y="572" font-size="11" fill="#444">Boundary do pod OpenShift</text>
+  <rect x="200" y="560" width="16" height="3" fill="#555"/>
+  <text x="222" y="572" font-size="11" fill="#444">Chamada síncrona</text>
+  <rect x="350" y="560" width="16" height="3" fill="#c0392b" rx="1"/>
+  <line x1="350" y1="562" x2="366" y2="562" stroke="#c0392b" stroke-width="3" stroke-dasharray="4,3"/>
+  <text x="372" y="572" font-size="11" fill="#444">Cache assíncrono</text>
+</svg>
+
+<div class="note">
+  <h3>Decisões de design</h3>
+  <table>
+    <thead><tr><th>Decisão</th><th>Motivo</th></tr></thead>
+    <tbody>
+      <tr><td>Native SQL em vez de JPQL</td><td>As queries do BI têm custo D$64 de 261K — precisam ser exatas para garantir os mesmos resultados. JPQL não consegue expressar os CASE Pronampe Solidário RS, subqueries de DT_REF=MAX nem EVT_OPR_R3TD.</td></tr>
+      <tr><td>Dois schemas DB2 (GFG + D4W)</td><td>DB2GFG é transacional (atualizado em tempo real). DB2D4W é o Data Warehouse pré-computado (snapshot diário). Operações e pendências vêm do DW por performance.</td></tr>
+      <tr><td>Redis apenas para warm-up de KPIs</td><td>Os 22 endpoints v1 são queries diretas no DB2 — suficientemente rápidos para o volume de agentes. Redis é reservado para KPIs agregados de alta frequência.</td></tr>
+      <tr><td>DT_REF = MAX subquery em todas as queries de CTRA_FNDO_GRTR</td><td>A tabela guarda histórico de snapshots. O filtro garante que sempre vemos o estado mais recente da carteira, sem precisar deletar dados antigos.</td></tr>
+      <tr><td>CD_FNDO_GRTR &lt;&gt; 1</td><td>FGO Original (código 1) é excluído conforme padrão do BI — não está no escopo do Painel do Agente.</td></tr>
+    </tbody>
+  </table>
+</div>
+</body>
+</html>

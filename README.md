@@ -4,6 +4,10 @@ Microserviço do **Painel do Agente Financeiro** do FGO (Fundo de Garantia de Op
 Desenvolvido em **Quarkus 3.x + Redis Sentinel + IBM DB2**, rodando em **OpenShift Local (CRC)** em servidor RHEL 9.
 
 > **[→ Documentação completa dos 22 endpoints (HTML)](endpoints.html)** — abrir no navegador para visualizar com formatação.
+>
+> **[→ Diagramas de Arquitetura N0/N1/N2/N3](docs/diagramas/index.html)** — Contexto · Containers · Componentes · Sequências
+>
+> **[→ Scripts SQL — DDL + Seed de teste](db/00_LEIAME.md)** — Criar tabelas e popular dados para testes no Swagger
 
 ---
 

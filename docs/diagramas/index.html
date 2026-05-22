@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Diagramas de Arquitetura — Painel Agentes FGO</title>
+<style>
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f4f8; margin: 0; padding: 40px; }
+  h1 { color: #1a3a5c; font-size: 24px; }
+  p { color: #555; margin-bottom: 32px; }
+  .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; max-width: 800px; }
+  .card { background: #fff; border: 1px solid #dde3ed; border-radius: 10px; padding: 28px 32px; text-decoration: none; color: inherit; transition: box-shadow .15s; }
+  .card:hover { box-shadow: 0 4px 20px rgba(0,0,0,.12); }
+  .card .level { font-size: 36px; font-weight: 800; color: #1a5cb5; }
+  .card h2 { font-size: 18px; color: #1a3a5c; margin: 8px 0 6px; }
+  .card .desc { font-size: 13px; color: #666; line-height: 1.5; }
+</style>
+</head>
+<body>
+<h1>Diagramas de Arquitetura — Painel Agentes FGO</h1>
+<p>Baseados no modelo C4 (Context → Containers → Components → Code)</p>
+<div class="cards">
+  <a class="card" href="N0_contexto.html">
+    <div class="level">N0</div>
+    <h2>Contexto</h2>
+    <p class="desc">O sistema no seu contexto externo: usuários, sistemas vizinhos (IIB gateway, DB2, Redis, OpenShift).</p>
+  </a>
+  <a class="card" href="N1_containers.html">
+    <div class="level">N1</div>
+    <h2>Containers</h2>
+    <p class="desc">Os principais containers: Angular SPA, Quarkus backend, Redis Sentinel cluster, IBM DB2 (DB2GFG + DB2D4W).</p>
+  </a>
+  <a class="card" href="N2_componentes.html">
+    <div class="level">N2</div>
+    <h2>Componentes</h2>
+    <p class="desc">Componentes internos do backend: Resources, Services, Repositories, mapeamento para os schemas DB2.</p>
+  </a>
+  <a class="card" href="N3_sequencias.html">
+    <div class="level">N3</div>
+    <h2>Sequências</h2>
+    <p class="desc">Diagramas de sequência dos fluxos principais: request Angular → IIB → Quarkus → DB2.</p>
+  </a>
+</div>
+</body>
+</html>

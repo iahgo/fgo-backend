@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>N2 — Componentes · Painel Agentes FGO</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f4f8; }
+  header { background: #1a3a5c; color: #fff; padding: 18px 32px; display: flex; align-items: center; gap: 16px; }
+  header a { color: #a8c0d8; font-size: 13px; text-decoration: none; }
+  header h1 { font-size: 18px; }
+  .wrap { max-width: 1100px; margin: 32px auto; padding: 0 20px; }
+  .canvas { width: 100%; display: block; margin-bottom: 32px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
+  .card { background: #fff; border: 1px solid #dde3ed; border-radius: 8px; padding: 16px 18px; }
+  .card h3 { font-size: 13px; font-weight: 700; color: #1a3a5c; margin-bottom: 8px; }
+  .card ul { list-style: none; }
+  .card li { font-size: 12px; color: #555; padding: 3px 0; border-bottom: 1px solid #f5f5f5; font-family: monospace; }
+  .badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 3px; margin-left: 4px; }
+  .gfg { background: #f3e8fb; color: #6c3483; }
+  .d4w { background: #e8f0fb; color: #1a5cb5; }
+</style>
+</head>
+<body>
+<header>
+  <a href="index.html">← Voltar</a>
+  <h1>N2 — Diagrama de Componentes (Backend)</h1>
+</header>
+<div class="wrap">
+
+<svg class="canvas" viewBox="0 0 1060 560" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, system-ui, sans-serif">
+  <rect width="1060" height="560" fill="#f0f4f8"/>
+  <text x="530" y="28" text-anchor="middle" font-size="15" font-weight="700" fill="#1a3a5c">N2 — Componentes do Backend Quarkus</text>
+
+  <!-- ═══ CAMADA: RESOURCE ═══ -->
+  <rect x="20" y="45" width="1020" height="90" rx="8" fill="#e8f0fb" stroke="#1a5cb5" stroke-width="1.5"/>
+  <text x="530" y="64" text-anchor="middle" font-size="12" font-weight="700" fill="#1a3a5c">Resource Layer  (JAX-RS · @Path · @GET · Swagger @Tag/@Operation)</text>
+
+  <rect x="30"  y="72" width="92"  height="54" rx="5" fill="#fff" stroke="#1a5cb5" stroke-width="1"/>
+  <text x="76"  y="91"  text-anchor="middle" font-size="9.5" font-weight="600" fill="#1a3a5c">FundoResource</text>
+  <text x="76"  y="105" text-anchor="middle" font-size="9" fill="#555">/api/v1/fundos</text>
+  <text x="76"  y="118" text-anchor="middle" font-size="9" fill="#888">ep. 1</text>
+
+  <rect x="130" y="72" width="100" height="54" rx="5" fill="#fff" stroke="#1a5cb5" stroke-width="1"/>
+  <text x="180" y="91"  text-anchor="middle" font-size="9.5" font-weight="600" fill="#1a3a5c">ProgramaResource</text>
+  <text x="180" y="105" text-anchor="middle" font-size="9" fill="#555">/api/v1/programas</text>
+  <text x="180" y="118" text-anchor="middle" font-size="9" fill="#888">ep. 2</text>
+
+  <rect x="238" y="72" width="100" height="54" rx="5" fill="#fff" stroke="#1a5cb5" stroke-width="1"/>
+  <text x="288" y="91"  text-anchor="middle" font-size="9.5" font-weight="600" fill="#1a3a5c">PainelResource</text>
+  <text x="288" y="105" text-anchor="middle" font-size="9" fill="#555">/api/v1/painel/*</text>
+  <text x="288" y="118" text-anchor="middle" font-size="9" fill="#888">ep. 3–9</text>
+
+  <rect x="346" y="72" width="108" height="54" rx="5" fill="#fff" stroke="#1a5cb5" stroke-width="1"/>
+  <text x="400" y="91"  text-anchor="middle" font-size="9.5" font-weight="600" fill="#1a3a5c">OperacoesPainel</text>
+  <text x="400" y="98"  text-anchor="middle" font-size="9.5" font-weight="600" fill="#1a3a5c">Resource</text>
+  <text x="400" y="110" text-anchor="middle" font-size="9" fill="#555">/api/v1/operacoes</text>
+  <text x="400" y="122" text-anchor="middle" font-size="9" fill="#888">ep. 10–11</text>
+
+  <rect x="462" y="72" width="120" height="54" rx="5" fill="#fff" stroke="#1a5cb5" stroke-width="1"/>
+  <text x="522" y="91"  text-anchor="middle" font-size="9.5" font-weight="600" fill="#1a3a5c">RemessaListagem</text>
+  <text x="522" y="98"  text-anchor="middle" font-size="9.5" font-weight="600" fill="#1a3a5c">Resource</text>
+  <text x="522" y="110" text-anchor="middle" font-size="9" fill="#555">/api/v1/remessas</text>
+  <text x="522" y="122" text-anchor="middle" font-size="9" fill="#888">ep. 12–15</text>
+
+  <rect x="590" y="72" width="120" height="54" rx="5" fill="#fff" stroke="#1a5cb5" stroke-width="1"/>
+  <text x="650" y="91"  text-anchor="middle" font-size="9.5" font-weight="600" fill="#1a3a5c">Movimentacao</text>
+  <text x="650" y="98"  text-anchor="middle" font-size="9.5" font-weight="600" fill="#1a3a5c">Resource</text>
+  <text x="650" y="110" text-anchor="middle" font-size="9" fill="#555">/api/v1/movimentacoes</text>
+  <text x="650" y="122" text-anchor="middle" font-size="9" fill="#888">ep. 16–19</text>
+
+  <rect x="718" y="72" width="108" height="54" rx="5" fill="#fff" stroke="#1a5cb5" stroke-width="1"/>
+  <text x="772" y="91"  text-anchor="middle" font-size="9.5" font-weight="600" fill="#1a3a5c">Pendencia</text>
+  <text x="772" y="98"  text-anchor="middle" font-size="9.5" font-weight="600" fill="#1a3a5c">Resource</text>
+  <text x="772" y="110" text-anchor="middle" font-size="9" fill="#555">/api/v1/pendencias</text>
+  <text x="772" y="122" text-anchor="middle" font-size="9" fill="#888">ep. 20–22</text>
+
+  <!-- ═══ CAMADA: SERVICE ═══ -->
+  <rect x="20" y="165" width="1020" height="80" rx="8" fill="#e8f4e8" stroke="#217a21" stroke-width="1.5"/>
+  <text x="530" y="184" text-anchor="middle" font-size="12" font-weight="700" fill="#1a3a5c">Service Layer  (@ApplicationScoped · Mapeamento Object[] → DTO · Cálculos de negócio)</text>
+
+  <rect x="30"  y="192" width="290" height="44" rx="5" fill="#fff" stroke="#217a21" stroke-width="1"/>
+  <text x="175" y="209" text-anchor="middle" font-size="10" font-weight="600" fill="#1a3a5c">PainelService</text>
+  <text x="175" y="224" text-anchor="middle" font-size="9" fill="#555">IVH · Inadimplência · Séries · Resumos</text>
+  <text x="175" y="234" text-anchor="middle" font-size="9" fill="#888">Serve: FundoR · ProgramaR · PainelR (ep.1–9)</text>
+
+  <rect x="330" y="192" width="200" height="44" rx="5" fill="#fff" stroke="#217a21" stroke-width="1"/>
+  <text x="430" y="209" text-anchor="middle" font-size="10" font-weight="600" fill="#1a3a5c">OperacaoListagemService</text>
+  <text x="430" y="224" text-anchor="middle" font-size="9" fill="#555">Mapeia 9 colunas → OperacaoItemDto</text>
+  <text x="430" y="234" text-anchor="middle" font-size="9" fill="#888">Serve: OperacoesPainelR (ep.10–11)</text>
+
+  <rect x="540" y="192" width="200" height="44" rx="5" fill="#fff" stroke="#217a21" stroke-width="1"/>
+  <text x="640" y="209" text-anchor="middle" font-size="10" font-weight="600" fill="#1a3a5c">RemessaListagemService</text>
+  <text x="640" y="224" text-anchor="middle" font-size="9" fill="#555">Mapeia 14 colunas → RemessaItemDto</text>
+  <text x="640" y="234" text-anchor="middle" font-size="9" fill="#888">Serve: RemessaListagemR (ep.12–15)</text>
+
+  <rect x="750" y="192" width="145" height="44" rx="5" fill="#fff" stroke="#217a21" stroke-width="1"/>
+  <text x="822" y="209" text-anchor="middle" font-size="10" font-weight="600" fill="#1a3a5c">MovimentacaoService</text>
+  <text x="822" y="224" text-anchor="middle" font-size="9" fill="#555">Mapeia 10 col → MovDto</text>
+  <text x="822" y="234" text-anchor="middle" font-size="9" fill="#888">Serve: MovR (ep.16–19)</text>
+
+  <rect x="905" y="192" width="125" height="44" rx="5" fill="#fff" stroke="#217a21" stroke-width="1"/>
+  <text x="967" y="209" text-anchor="middle" font-size="10" font-weight="600" fill="#1a3a5c">PendenciaService</text>
+  <text x="967" y="224" text-anchor="middle" font-size="9" fill="#555">Mapeia 6 col</text>
+  <text x="967" y="234" text-anchor="middle" font-size="9" fill="#888">Serve: PendR (ep.20–22)</text>
+
+  <!-- ═══ CAMADA: REPOSITORY ═══ -->
+  <rect x="20" y="275" width="1020" height="80" rx="8" fill="#fff8e1" stroke="#f0a500" stroke-width="1.5"/>
+  <text x="530" y="294" text-anchor="middle" font-size="12" font-weight="700" fill="#1a3a5c">Repository Layer  (Native SQL · EntityManager · @Transactional · Positional params ?)</text>
+
+  <rect x="30"  y="302" width="290" height="44" rx="5" fill="#fff" stroke="#f0a500" stroke-width="1"/>
+  <text x="175" y="319" text-anchor="middle" font-size="10" font-weight="600" fill="#1a3a5c">PainelRepository</text>
+  <text x="175" y="334" text-anchor="middle" font-size="9" fill="#555">10 métodos de agregação para KPIs do painel</text>
+  <text x="175" y="344" text-anchor="middle" font-size="9" fill="#888">CTRA_FNDO_GRTR (DT_REF=MAX) + RMS_AGT_FNCO + DETT_OPR_PND</text>
+
+  <rect x="330" y="302" width="200" height="44" rx="5" fill="#fff" stroke="#f0a500" stroke-width="1"/>
+  <text x="430" y="319" text-anchor="middle" font-size="10" font-weight="600" fill="#1a3a5c">OperacaoListagemRepository</text>
+  <text x="430" y="334" text-anchor="middle" font-size="9" fill="#555">listar · contar · listarTodos</text>
+  <text x="430" y="344" text-anchor="middle" font-size="9" fill="#888">DB2D4W.CTRA_FNDO_GRTR (BASE_ANL_OPR)</text>
+
+  <rect x="540" y="302" width="200" height="44" rx="5" fill="#fff" stroke="#f0a500" stroke-width="1"/>
+  <text x="640" y="319" text-anchor="middle" font-size="10" font-weight="600" fill="#1a3a5c">RemessaListagemRepository</text>
+  <text x="640" y="334" text-anchor="middle" font-size="9" fill="#555">listar · contar · listarTodos</text>
+  <text x="640" y="344" text-anchor="middle" font-size="9" fill="#888">DB2GFG.RMS_AGT_FNCO (REMESSAS BI)</text>
+
+  <rect x="750" y="302" width="145" height="44" rx="5" fill="#fff" stroke="#f0a500" stroke-width="1"/>
+  <text x="822" y="319" text-anchor="middle" font-size="10" font-weight="600" fill="#1a3a5c">MovimentacaoRepository</text>
+  <text x="822" y="334" text-anchor="middle" font-size="9" fill="#555">listar + buscarDetalhe</text>
+  <text x="822" y="344" text-anchor="middle" font-size="9" fill="#888">RMS_AGT_FNCO + RSM_MVTC_FNCR</text>
+
+  <rect x="905" y="302" width="125" height="44" rx="5" fill="#fff" stroke="#f0a500" stroke-width="1"/>
+  <text x="967" y="319" text-anchor="middle" font-size="10" font-weight="600" fill="#1a3a5c">PendenciaRepository</text>
+  <text x="967" y="334" text-anchor="middle" font-size="9" fill="#555">listar · contar · listarTodos</text>
+  <text x="967" y="344" text-anchor="middle" font-size="9" fill="#888">DB2D4W.DETT_OPR_PND</text>
+
+  <!-- ═══ CAMADA: DB ═══ -->
+  <rect x="20" y="385" width="490" height="130" rx="8" fill="#f3e8fb" stroke="#6c3483" stroke-width="1.5"/>
+  <text x="265" y="404" text-anchor="middle" font-size="12" font-weight="700" fill="#1a3a5c">DB2GFG — Schema Transacional</text>
+  <text x="140" y="426" text-anchor="middle" font-size="10" fill="#6c3483" font-weight="600">RMS_AGT_FNCO</text>
+  <text x="140" y="442" text-anchor="middle" font-size="9" fill="#555">Remessas · Movimentações</text>
+  <text x="265" y="426" text-anchor="middle" font-size="10" fill="#6c3483" font-weight="600">RSM_MVTC_FNCR_RMS</text>
+  <text x="265" y="442" text-anchor="middle" font-size="9" fill="#555">Detalhe financeiro</text>
+  <text x="390" y="426" text-anchor="middle" font-size="10" fill="#6c3483" font-weight="600">EVT_OPR_R3TD</text>
+  <text x="390" y="442" text-anchor="middle" font-size="9" fill="#555">Eventos R3TD</text>
+  <text x="140" y="465" text-anchor="middle" font-size="10" fill="#6c3483" font-weight="600">AGT_FNCO · FNDO_GRTR</text>
+  <text x="140" y="481" text-anchor="middle" font-size="9" fill="#555">Domínio</text>
+  <text x="290" y="465" text-anchor="middle" font-size="10" fill="#6c3483" font-weight="600">TIP_EST_RMS · TIP_MTV_RJC_RMS</text>
+  <text x="290" y="481" text-anchor="middle" font-size="9" fill="#555">Lookups de status/motivo</text>
+  <text x="200" y="504" text-anchor="middle" font-size="9" fill="#888">IBM DB2 · JDBC · Quarkus Hibernate ORM</text>
+
+  <rect x="550" y="385" width="490" height="130" rx="8" fill="#e8f0fb" stroke="#1a5cb5" stroke-width="1.5"/>
+  <text x="795" y="404" text-anchor="middle" font-size="12" font-weight="700" fill="#1a3a5c">DB2D4W — Schema Analytics (Data Warehouse)</text>
+  <text x="670" y="426" text-anchor="middle" font-size="10" fill="#1a5cb5" font-weight="600">CTRA_FNDO_GRTR</text>
+  <text x="670" y="442" text-anchor="middle" font-size="9" fill="#555">Snapshot operações</text>
+  <text x="670" y="458" text-anchor="middle" font-size="9" fill="#888">DT_REF = MAX → estado atual</text>
+  <text x="670" y="474" text-anchor="middle" font-size="9" fill="#888">Inclui campos desnormalizados</text>
+  <text x="900" y="426" text-anchor="middle" font-size="10" fill="#1a5cb5" font-weight="600">DETT_OPR_PND</text>
+  <text x="900" y="442" text-anchor="middle" font-size="9" fill="#555">Pendências pré-computadas</text>
+  <text x="900" y="458" text-anchor="middle" font-size="9" fill="#888">NM_TIP_PNC_OPR_CRD = texto</text>
+  <text x="900" y="474" text-anchor="middle" font-size="9" fill="#888">DT_SNC_PHC = início pendência</text>
+  <text x="795" y="504" text-anchor="middle" font-size="9" fill="#888">IBM DB2 · Atualização diária pelo DW</text>
+
+  <!-- Setas camadas -->
+  <line x1="530" y1="135" x2="530" y2="165" stroke="#555" stroke-width="1.2" marker-end="url(#aa)"/>
+  <line x1="530" y1="245" x2="530" y2="275" stroke="#555" stroke-width="1.2" marker-end="url(#aa)"/>
+  <line x1="530" y1="355" x2="530" y2="385" stroke="#555" stroke-width="1.2" marker-end="url(#aa)"/>
+
+  <defs>
+    <marker id="aa" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#555"/></marker>
+  </defs>
+</svg>
+
+<!-- Tabela de mapeamento endpoints → tabelas -->
+<div class="grid">
+  <div class="card">
+    <h3>Painel KPIs (ep. 1–9)</h3>
+    <ul>
+      <li>FundoResource → PainelService → PainelRepository</li>
+      <li>→ CTRA_FNDO_GRTR <span class="badge d4w">D4W</span></li>
+      <li>→ RMS_AGT_FNCO <span class="badge gfg">GFG</span></li>
+      <li>→ DETT_OPR_PND <span class="badge d4w">D4W</span></li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Operações (ep. 10–11)</h3>
+    <ul>
+      <li>OperacoesPainelResource → OperacaoListagemService</li>
+      <li>→ OperacaoListagemRepository</li>
+      <li>→ CTRA_FNDO_GRTR <span class="badge d4w">D4W</span></li>
+      <li>DT_REF=MAX · Pronampe RS CASE</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Remessas (ep. 12–15)</h3>
+    <ul>
+      <li>RemessaListagemResource → RemessaListagemService</li>
+      <li>→ RemessaListagemRepository</li>
+      <li>→ RMS_AGT_FNCO <span class="badge gfg">GFG</span></li>
+      <li>+ EVT_OPR_R3TD (subquery QT_REG_ACT)</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Movimentações (ep. 16–19)</h3>
+    <ul>
+      <li>MovimentacaoResource → MovimentacaoService</li>
+      <li>→ MovimentacaoRepository</li>
+      <li>→ RMS_AGT_FNCO <span class="badge gfg">GFG</span> (CD_TIP_NTZ_MVTC IN (1,2))</li>
+      <li>→ RSM_MVTC_FNCR_RMS <span class="badge gfg">GFG</span> (detalhe)</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Pendências (ep. 20–22)</h3>
+    <ul>
+      <li>PendenciaResource → PendenciaService</li>
+      <li>→ PendenciaRepository</li>
+      <li>→ DETT_OPR_PND <span class="badge d4w">D4W</span></li>
+      <li>tipoPendencia = NM_TIP_PNC_OPR_CRD (texto)</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Padrões comuns</h3>
+    <ul>
+      <li>PageDto&lt;T&gt; para paginação</li>
+      <li>FiltroItemDto para lookups estáticos</li>
+      <li>Todos os filtros: -1 = todos</li>
+      <li>Exportar CSV: StreamingOutput</li>
+    </ul>
+  </div>
+</div>
+</div>
+</body>
+</html>

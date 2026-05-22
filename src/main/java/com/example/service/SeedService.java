@@ -521,8 +521,8 @@ public class SeedService {
         String sql = """
             INSERT INTO DB2GFG.RMS_AGT_FNCO (
               CD_RMS_AGT_FNCO, CD_FNDO_GRTR, CD_AGT_FNCO, NR_SEQL_RMS, NM_DTST,
-              DT_VRS_LAUT, TS_RCT_RMS, DT_PRCT_EVT, DT_CTC_UTZD_PRCT,
-              DT_ATL_MNTR, DT_MVTC_FNCR, CD_MTV_RJC_RMS, VL_LODO_MVTC_RMS,
+              DT_VRS_LAUT, TS_RCBT_RMS, DT_PRCT_EVT, DT_CTC_UTZD_PRCT,
+              DT_ATL_MNTR, DT_MVTC_FNCR, CD_MTV_RJC_RMS, VL_LQDO_MVTC_RMS,
               CD_TIP_NTZ_MVTC, CD_TIP_EST_RMS, QT_REG_RMS
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """;
