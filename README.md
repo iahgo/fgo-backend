@@ -1,14 +1,15 @@
-# MS Operação FGO — Backend
+# Painel Agentes FGO — Backend
 
-Microserviço de KPIs de Operações de Crédito do Fundo de Garantia de Operações (FGO).  
-Desenvolvido em **Quarkus 3.8.4 + Redis Sentinel + IBM DB2**, rodando em **OpenShift Local (CRC)** em servidor RHEL 9.
+Microserviço do **Painel do Agente Financeiro** do FGO (Fundo de Garantia de Operações).  
+Desenvolvido em **Quarkus 3.x + Redis Sentinel + IBM DB2**, rodando em **OpenShift Local (CRC)** em servidor RHEL 9.
+
+> **[→ Documentação completa dos 22 endpoints (HTML)](endpoints.html)** — abrir no navegador para visualizar com formatação.
 
 ---
 
-## 🔗 Links de acesso público (internet)
+## Links de acesso público (internet)
 
-> Expostos via **Tailscale Funnel** — URL fixa `*.ts.net`, sem VPN, sem domínio, sem configuração de roteador.  
-> Funciona para qualquer pessoa na internet.
+> Expostos via **Tailscale Funnel** — URL fixa `*.ts.net`, sem VPN.
 
 | Recurso | URL pública |
 |---|---|
@@ -29,47 +30,37 @@ Login no Console: acesse a URL acima → selecione **fgo-htpasswd** → entre co
 | `fgo-viewer` | `FgoView2026!` | View em `fgo-backend` — somente leitura |
 | `log-viewer` | `FgoLog2026!` | View em `fgo-backend` — somente leitura |
 
-Login via CLI:
 ```bash
-oc login --server=https://api.crc.testing:6443 -u fgo-viewer -p 'FgoView2026!'
+oc login --server=https://api.crc.testing:6443 -u fgo-dev -p 'FgoDev2026!'
 ```
-
-> Para reconfigurar o tunnel: `sudo bash scripts/setup-tailscale-funnel.sh`  
-> Para recriar os usuários: `bash scripts/setup-openshift-users.sh`
 
 ---
 
-## 🔗 Links internos (rede local / Tailscale)
+## Links internos (rede local / Tailscale)
 
 | Recurso | URL |
 |---|---|
 | **Swagger UI (local)** | `https://ms-operacao-fgo-backend.apps-crc.testing/q/swagger-ui` |
 | **Console OpenShift (local)** | `https://console-openshift-console.apps-crc.testing` |
 
-> URL exata: `oc get route ms-operacao -n fgo-backend -o jsonpath='{.spec.host}'`
-
 ---
 
 ## Arquitetura
 
 ```
-Angular  →  IIB (gateway BB)  →  MS Operação  →  Redis Sentinel
-                                      ↑                  ↑
-                                    warm-up          serve < 1ms
-                                      ↓
-                                    DB2 12.1
-                               (100M operações, 35 GB)
+Angular  →  IIB (gateway BB)  →  MS Painel FGO  →  Redis Sentinel (cache KPIs)
+                                       ↓
+                                    IBM DB2
+                             DB2D4W (analytics)
+                             DB2GFG (transacional)
 ```
 
-### Fluxo de dados
+### Schemas DB2
 
-1. **Warm-up** (07:20 diário + startup): queries de agregação no DB2 → JSON compacto gravado no Redis (TTL 25h)
-2. **Requisição do agente**: `GET /api/operacoes/{mesAno}` → Redis GET → resposta < 1ms — DB2 não é tocado
-3. **Lock distribuído**: `SET NX` no Redis garante que apenas 1 pod carregue cada agente, mesmo com 3 réplicas
-
-### Sobre o Redis sobrescrever dados no startup
-
-Sim, é intencional. Cada vez que um pod sobe, o warm-up roda em background e sobrescreve o Redis com dados frescos do DB2. O lock distribuído evita que múltiplos pods façam isso ao mesmo tempo. O DB2 é a fonte da verdade; o Redis é o cache. O TTL de 25h garante que os dados persistam entre restarts normais.
+| Schema | Tipo | Tabelas principais |
+|---|---|---|
+| `DB2D4W` | Data Warehouse (analytics) | `CTRA_FNDO_GRTR` (operações, snapshot DT_REF=MAX), `DETT_OPR_PND` (pendências pré-computadas) |
+| `DB2GFG` | Transacional / domínio | `RMS_AGT_FNCO` (remessas), `RSM_MVTC_FNCR_RMS` (detalhe movimentação), `AGT_FNCO_FNDO_GRTR`, `TIP_PGM_CRD`, `FNDO_GRTR` |
 
 ---
 
@@ -77,176 +68,83 @@ Sim, é intencional. Cada vez que um pod sobe, o warm-up roda em background e so
 
 | Componente | Tecnologia |
 |---|---|
-| Runtime | Quarkus 3.8.4 (JVM 17) |
-| Banco de dados | IBM DB2 12.1 (em container Podman) |
+| Runtime | Quarkus 3.x (JVM 17) |
+| Banco de dados | IBM DB2 for z/OS (queries nativas — sem JPQL nos endpoints BI) |
 | Cache | Redis 7 — modo Sentinel (1 master + 2 réplicas + 3 sentinels) |
-| Orquestração | OpenShift Local (CRC) 2.60 / OpenShift 4.18 |
+| Orquestração | OpenShift Local (CRC) / OpenShift 4.18 |
 | CI/CD | GitHub Actions — self-hosted runner no servidor RHEL 9 |
-| Build de imagem | Podman (sem Docker daemon) |
-| Registry | OpenShift internal registry (localhost) |
 
 ---
 
-## API — Endpoints
+## API — Endpoints v1 (22 endpoints)
 
-### Operações de Crédito
+> Documentação detalhada com exemplos de resposta: **[endpoints.html](endpoints.html)**
 
-| Método | Endpoint | Descrição |
-|---|---|---|
-| `GET` | `/api/operacoes/{mesAno}` | KPIs do agente para o mês (Redis, < 1ms) |
-| `GET` | `/api/operacoes/{mesAno}/consolidado` | Visão admin: todos os agentes por programa e ranking (DB2 direto, lento) |
+### Grupos
 
-> **Header obrigatório:** `X-Cod-Agente: <cod>` — em produção injetado pelo IIB a partir do token do usuário.
+| Grupo | Base path | Endpoints | Fonte DB2 |
+|---|---|---|---|
+| Fundos | `/api/v1/fundos` | 1 | `DB2D4W.CTRA_FNDO_GRTR` |
+| Programas | `/api/v1/programas` | 1 | `DB2D4W.CTRA_FNDO_GRTR` |
+| Painel KPIs | `/api/v1/painel` | 7 (ep. 3–9) | `CTRA_FNDO_GRTR`, `DETT_OPR_PND`, `RMS_AGT_FNCO` |
+| Operações | `/api/v1/operacoes` | 2 (ep. 10–11) | `DB2D4W.CTRA_FNDO_GRTR` (BASE_ANL_OPR BI) |
+| Remessas | `/api/v1/remessas` | 4 (ep. 12–15) | `DB2GFG.RMS_AGT_FNCO` (REMESSAS BI) |
+| Movimentações | `/api/v1/movimentacoes` | 4 (ep. 16–19) | `DB2GFG.RMS_AGT_FNCO` (MVTC_FNCR BI) + `RSM_MVTC_FNCR_RMS` |
+| Pendências | `/api/v1/pendencias` | 3 (ep. 20–22) | `DB2D4W.DETT_OPR_PND` (PENDENCIAS BI) |
 
-### Agentes Financeiros
+### Convenções de filtros
 
-| Método | Endpoint | Descrição |
-|---|---|---|
-| `GET` | `/api/agentes` | Lista os 40 agentes financeiros cadastrados |
-
-### Remessas
-
-| Método | Endpoint | Descrição |
-|---|---|---|
-| `GET` | `/api/remessas` | Remessas do agente (últimas 50, `?limite=N`) |
-| `GET` | `/api/remessas/{id}` | Detalhe de uma remessa |
-
-### Admin — Reload de Cache
-
-| Método | Endpoint | Descrição |
-|---|---|---|
-| `POST` | `/api/operacoes/admin/reload` | Recarrega Redis de todos os agentes (background) |
-| `POST` | `/api/operacoes/admin/reload/{codAgente}` | Recarrega um agente específico |
-
-### Admin — Monitoramento *(somente leitura)*
-
-| Método | Endpoint | Descrição |
-|---|---|---|
-| `GET` | `/admin/sistema` | CPU, RAM, disco, JVM, Redis INFO, tamanho das tabelas DB2 |
-| `GET` | `/admin/logs` | Últimas 2.000 linhas de log deste pod (`?limite=N&nivel=ERROR`) |
-| `GET` | `/admin/seed/status` | Progresso do seed de dados |
-
-### Admin — Seed de Dados ⚠️ *Destrutivos*
-
-| Método | Endpoint | Descrição |
-|---|---|---|
-| `POST` | `/admin/seed` | **APAGA TUDO** e gera N operações sintéticas (`?quantidade=100000000&limpar=true`) |
-| `POST` | `/admin/seed/remessas` | Recria apenas a tabela `RMS_AGT_FNCO` (preserva operações) |
+- `cdAgtFnco` — obrigatório em todos. **TODO:** substituir por JWT.
+- `-1` para int = sem filtro (todos os fundos / programas / situações).
+- `null` para string = sem filtro.
+- `page` 0-based, `size` aceita apenas 10, 50 ou 100.
 
 ---
 
-## Dados de exemplo
+## Pendências técnicas (TODOs)
 
-| Tabela | Registros | Tamanho |
+| # | Item | Prioridade |
 |---|---|---|
-| `OPR_CRD_FNDO_GRTR` (operações) | ~100.000.000 | ~35 GB |
-| `RMS_AGT_FNCO` (remessas) | ~11.800 | < 10 MB |
-| `AGT_FNCO` (agentes) | 40 | — |
-| `TIP_PGM_CRD` (programas) | 6 | — |
-| Redis (cache por agente/mês) | 40 chaves ativas | ~2–5 MB |
-
-**Agentes financeiros cadastrados:** BB, CEF, Bradesco, Itaú, Santander, Sicredi, Sicoob, BTG Pactual, XP, Inter, Nubank, Safra, Votorantim, BMG, Banrisul, BRB, Modal, Pan, Agibank, C6 Bank, Original, Mercantil, Paraná, Alfa, Fibra, Daycoval, Sofisa, Industrial, ABC Brasil, Rabobank, JPMorgan, Goldman Sachs, BNP Paribas, Deutsche Bank, Citibank, HSBC, Pine, Neon, PicPay, Will.
-
-**Programas de crédito:** PRONAMPE, FGI, PEAC, Emergencial Investimento, FGO Rural, FGO Geral.
-
----
-
-## Observabilidade
-
-### Logs por requisição
-Cada requisição gera dois logs INFO no logger `fgo.access`:
-```
-[REQ][A3F1B2] GET /api/operacoes/2026-04 agente=8
-[RES][A3F1B2] GET /api/operacoes/2026-04 → HTTP 200 em 0ms body={...}
-[SLOW][A3F1B2] GET /api/operacoes/2026-04/consolidado demorou 8231ms
-```
-
-### Ver logs do pod
-```bash
-# Logs em tempo real de todos os pods
-oc logs -f -l app=ms-operacao -n fgo-backend
-
-# Logs de um pod específico
-oc logs ms-operacao-<hash> -n fgo-backend
-
-# Via API (não requer CLI)
-curl -H "X-Cod-Agente: 1" https://<ROUTE_HOST>/admin/logs?nivel=ERROR
-```
-
-### Criar usuário somente-leitura (log-viewer)
-```bash
-# 1. Aplicar manifesto
-oc apply -f openshift/08-log-viewer-rbac.yaml
-
-# 2. Gerar token (válido por 1 ano)
-oc create token log-viewer -n fgo-backend --duration=8760h
-
-# 3. Compartilhar o token — o usuário faz login assim:
-oc login --server=https://api.crc.testing:6443 --token=<TOKEN>
-# Ou acessa o console: https://console-openshift-console.apps-crc.testing
-```
+| 1 | Substituir `?cdAgtFnco=` por contexto JWT em todos os endpoints | Alta |
+| 2 | Verificar nomes de coluna no DB2 real: `TX_TIP_MTV_RJC_RMS`, `TS_RCBT_RMS`, `VL_LQDO_MVTC_RMS` | Alta |
+| 3 | `MovimentacaoResource.detalhe()` — path param semântico: deve usar PK `CD_RMS_AGT_FNCO`, não `NR_SEQL_RMS` | Média |
+| 4 | Diagrama de arquitetura N0/N1/N2/N3 (decisões de design) | Baixa |
+| 5 | Endpoint `/api/operacoes/lista` legado (DB2GFG) — avaliar remoção após validação dos v1 | Baixa |
 
 ---
 
 ## Como rodar localmente
 
-### Pré-requisitos
-- Java 17+, Maven 3.9+
-- DB2 acessível (configure `.env`)
-- Redis (levantado automaticamente pelo Quarkus Dev Services via Docker)
-
 ```bash
-# Clone
-git clone https://github.com/iahgo/fgo-backend.git
-cd fgo-backend
+# Pré-requisitos: Java 17+, Maven 3.9+, DB2 acessível
 
-# Configure o .env (copie o exemplo e preencha)
-# cp .env.example .env  (arquivo removido do repo — crie manualmente)
-# Conteúdo mínimo:
-# DB2_HOST=<ip-do-db2>
-# DB2_PORT=50000
-# DB2_DATABASE=DCG1
-# DB2_USER=db2inst1
-# DB2_PASSWORD=<senha>
+# Configure conexão DB2
+# DB2_HOST=<ip>  DB2_PORT=50000  DB2_DATABASE=DCG1  DB2_USER=...  DB2_PASSWORD=...
 
-# Iniciar em modo dev (Redis sobe automaticamente)
+# Iniciar (Redis sobe automaticamente via Dev Services)
 mvn quarkus:dev
 
 # Swagger UI disponível em:
 # http://localhost:8080/q/swagger-ui
 ```
 
-### Popular dados de teste
-```bash
-# Gera 100M de operações (demora ~30min — acompanhe em /admin/seed/status)
-curl -X POST "http://localhost:8080/admin/seed?quantidade=100000000&limpar=true"
-
-# Popula remessas diárias sem apagar operações
-curl -X POST "http://localhost:8080/admin/seed/remessas"
-
-# Força warm-up do Redis após o seed
-curl -X POST -H "X-Cod-Agente: 1" http://localhost:8080/api/operacoes/admin/reload
-```
-
 ---
 
 ## CI/CD
 
-O pipeline GitHub Actions roda **no servidor RHEL 9** (self-hosted runner em `/opt/fgo/runner`):
-
 ```
 push main
    ↓
-[Job 1] Testes unitários (mvn test)
+[Job 1] mvn test
    ↓
-[Job 2] Build JAR → Podman build → Push registry interno OpenShift
+[Job 2] Build JAR → Podman build → Push registry OpenShift
    ↓
-oc set image deployment/ms-operacao → Rolling update (zero downtime)
+oc set image deployment → Rolling update (zero downtime)
    ↓
-Smoke test GET /q/health/live → Summary no GitHub Actions
+Smoke test GET /q/health/live
 ```
 
-**Secret necessário:** `OPENSHIFT_TOKEN` em Settings → Secrets → Actions (token da SA `github-deployer`).
+**Secret necessário:** `OPENSHIFT_TOKEN` em Settings → Secrets → Actions.
 
 ---
 
@@ -254,18 +152,21 @@ Smoke test GET /q/health/live → Summary no GitHub Actions
 
 ```
 com.example
-├── config/       FgoConfig (TTL, lock)
-├── domain/       Entidades JPA e objetos de domínio
-├── dto/          DTOs de resposta da API
-├── exception/    Exceções de negócio + GlobalExceptionMapper
-├── filter/       RequestResponseLoggingFilter (req/res + elapsed)
-├── health/       RedisHealthCheck, Db2HealthCheck
-├── loader/       OperacaoLoader (warm-up, scheduler, reload)
-├── log/          LogBuffer + LogBufferHandler (logs em memória)
-├── listener/     OperacaoReloadSubscriber (Redis Pub/Sub)
-├── mapper/       OperacaoMapper (domain → DTO)
-├── repository/   OperacaoRepository (DB2), OperacaoRedisRepository, RemessaRepository
-├── resource/     Endpoints REST (Operacao, Agente, Remessa, Seed, Sistema, Log)
-└── service/      OperacaoService, AgenteService, RemessaService, ConsolidadoService,
-                  SistemaService, SeedService
+├── dto/
+│   ├── painel/          DTOs dos KPIs (FundoDto, IvhItemDto, InadimplenciaDto, ...)
+│   └── listagem/        DTOs das listagens (OperacaoItemDto, RemessaItemDto, ...)
+├── repository/
+│   ├── PainelRepository            Queries nativas para os KPIs do painel
+│   ├── OperacaoListagemRepository  BASE_ANL_OPR (DB2D4W.CTRA_FNDO_GRTR)
+│   ├── RemessaListagemRepository   REMESSAS BI (DB2GFG.RMS_AGT_FNCO)
+│   ├── MovimentacaoRepository      MVTC_FNCR + DET_MVT_FNCR BI
+│   └── PendenciaRepository         PENDENCIAS BI (DB2D4W.DETT_OPR_PND)
+├── service/
+│   ├── PainelService, OperacaoListagemService
+│   ├── RemessaListagemService, MovimentacaoService, PendenciaService
+└── resource/
+    ├── FundoResource, ProgramaResource, PainelResource
+    ├── OperacoesPainelResource, RemessaListagemResource
+    ├── MovimentacaoResource, PendenciaResource
+    └── (legacy) OperacaoListagemResource, OperacaoResource, RemessaResource
 ```

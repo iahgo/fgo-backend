@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel Agentes FGO — Endpoints API v1</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f5f7fa; color: #1a1d23; }
+  header { background: #1a3a5c; color: #fff; padding: 24px 40px; }
+  header h1 { font-size: 22px; font-weight: 600; }
+  header p { font-size: 13px; color: #a8c0d8; margin-top: 4px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 40px; }
+  .toc { background: #fff; border: 1px solid #dde3ed; border-radius: 8px; padding: 20px 28px; margin-bottom: 36px; }
+  .toc h2 { font-size: 14px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
+  .toc ul { list-style: none; columns: 2; gap: 24px; }
+  .toc li { margin-bottom: 6px; }
+  .toc a { color: #1a5cb5; font-size: 13px; text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .group { margin-bottom: 40px; }
+  .group-title { font-size: 18px; font-weight: 700; color: #1a3a5c; border-bottom: 2px solid #1a3a5c; padding-bottom: 8px; margin-bottom: 20px; }
+  .group-sub { font-size: 12px; font-weight: 400; color: #5a7a9a; margin-left: 8px; }
+  .endpoint { background: #fff; border: 1px solid #dde3ed; border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
+  .ep-header { display: flex; align-items: center; gap: 14px; padding: 14px 20px; cursor: pointer; }
+  .method { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 4px; min-width: 46px; text-align: center; }
+  .GET { background: #e8f4e8; color: #217a21; }
+  .ep-path { font-family: monospace; font-size: 14px; color: #1a3a5c; font-weight: 600; }
+  .ep-summary { font-size: 13px; color: #444; margin-left: auto; }
+  .ep-body { border-top: 1px solid #eef0f4; padding: 20px 24px; }
+  .ep-desc { font-size: 13px; color: #555; margin-bottom: 16px; line-height: 1.6; }
+  .ep-desc strong { color: #1a3a5c; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+  thead th { background: #f0f3f8; text-align: left; padding: 8px 12px; font-weight: 600; color: #444; }
+  tbody td { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+  .label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: #888; margin-bottom: 6px; }
+  .resp-box { background: #f8fafc; border: 1px solid #dde3ed; border-radius: 6px; padding: 14px 16px; font-family: monospace; font-size: 12px; line-height: 1.7; white-space: pre-wrap; color: #1a1d23; }
+  .badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 3px; }
+  .badge-req { background: #fff3cd; color: #856404; }
+  .badge-opt { background: #e2e3e5; color: #555; }
+  .note { background: #fffbea; border-left: 3px solid #f0a500; padding: 10px 14px; font-size: 12px; color: #7a5a00; border-radius: 0 4px 4px 0; margin-bottom: 12px; }
+  .db-tag { display: inline-block; font-size: 11px; background: #e8edf5; color: #1a3a5c; padding: 2px 8px; border-radius: 3px; font-family: monospace; margin-bottom: 8px; }
+  code { background: #f0f3f8; padding: 1px 5px; border-radius: 3px; font-family: monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Painel Agentes FGO — API v1</h1>
+  <p>Quarkus 3.x · IBM DB2 (DB2D4W / DB2GFG) · Redis Sentinel · 22 endpoints</p>
+</header>
+<div class="container">
+
+<!-- ÍNDICE -->
+<div class="toc">
+  <h2>Índice</h2>
+  <ul>
+    <li><a href="#fundos">1. Fundos</a></li>
+    <li><a href="#programas">2. Programas</a></li>
+    <li><a href="#painel-info">3. Painel — Informações Gerais</a></li>
+    <li><a href="#painel-inad">4. Painel — Inadimplência</a></li>
+    <li><a href="#painel-ivh">5. Painel — IVH por Programa</a></li>
+    <li><a href="#painel-ivh-serie">6. Painel — IVH Série Histórica</a></li>
+    <li><a href="#painel-remessas">7. Painel — Remessas Resumo</a></li>
+    <li><a href="#painel-pendencias">8. Painel — Pendências Resumo</a></li>
+    <li><a href="#painel-movim">9. Painel — Movimentação Série</a></li>
+    <li><a href="#op-lista">10. Operações — Listagem</a></li>
+    <li><a href="#op-exportar">11. Operações — Exportar CSV</a></li>
+    <li><a href="#rem-sit">12. Remessas — Filtros Situações</a></li>
+    <li><a href="#rem-mot">13. Remessas — Filtros Motivos</a></li>
+    <li><a href="#rem-lista">14. Remessas — Listagem</a></li>
+    <li><a href="#rem-exportar">15. Remessas — Exportar CSV</a></li>
+    <li><a href="#mov-sit">16. Movimentações — Filtros Situações</a></li>
+    <li><a href="#mov-lista">17. Movimentações — Listagem</a></li>
+    <li><a href="#mov-detalhe">18. Movimentações — Detalhe</a></li>
+    <li><a href="#mov-exportar">19. Movimentações — Exportar CSV</a></li>
+    <li><a href="#pend-filtros">20. Pendências — Filtros Tipos</a></li>
+    <li><a href="#pend-lista">21. Pendências — Listagem</a></li>
+    <li><a href="#pend-exportar">22. Pendências — Exportar CSV</a></li>
+  </ul>
+</div>
+
+<div class="note">
+  <strong>TODO Auth:</strong> Todos os endpoints recebem <code>?cdAgtFnco=</code> como query param provisório.
+  Será substituído por contexto JWT quando autenticação for implementada.<br>
+  <strong>Convenção de filtros:</strong> <code>-1</code> = todos (fundos, programas, situações). <code>null</code> = sem filtro (texto).
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     GRUPO: FUNDOS E PROGRAMAS
+═══════════════════════════════════════════════════════════ -->
+<div class="group">
+  <div class="group-title">Fundos e Programas <span class="group-sub">DB2D4W.CTRA_FNDO_GRTR · DT_REF=MAX</span></div>
+
+  <!-- EP 1 -->
+  <div class="endpoint" id="fundos">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/fundos</span>
+      <span class="ep-summary">Lista fundos do agente</span>
+    </div>
+    <div class="ep-body">
+      <div class="db-tag">DB2D4W.CTRA_FNDO_GRTR · DT_REF=MAX · CD_FNDO_GRTR &lt;&gt; 1</div>
+      <p class="ep-desc">Retorna os fundos garantidores nos quais o agente possui operações (snapshot mais recente).</p>
+      <div class="label">Parâmetros</div>
+      <table>
+        <thead><tr><th>Param</th><th>Tipo</th><th>Obrig.</th><th>Descrição</th></tr></thead>
+        <tbody>
+          <tr><td><code>cdAgtFnco</code></td><td>int</td><td><span class="badge badge-req">Obrig.</span></td><td>Código do agente financeiro</td></tr>
+        </tbody>
+      </table>
+      <div class="label">Resposta 200</div>
+      <div class="resp-box">[
+  { "cdFundo": 2, "nmFundo": "FGI" },
+  { "cdFundo": 3, "nmFundo": "PEAC" }
+]</div>
+    </div>
+  </div>
+
+  <!-- EP 2 -->
+  <div class="endpoint" id="programas">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/programas</span>
+      <span class="ep-summary">Lista programas do agente</span>
+    </div>
+    <div class="ep-body">
+      <div class="db-tag">DB2D4W.CTRA_FNDO_GRTR · DT_REF=MAX · Inclui Pronampe Solidário RS</div>
+      <p class="ep-desc">Retorna os programas de crédito do agente. Inclui lógica Pronampe Solidário RS (CD_TIP_PGM_CRD=42 com datas). Filtro opcional por fundo.</p>
+      <div class="label">Parâmetros</div>
+      <table>
+        <thead><tr><th>Param</th><th>Tipo</th><th>Obrig.</th><th>Descrição</th></tr></thead>
+        <tbody>
+          <tr><td><code>cdAgtFnco</code></td><td>int</td><td><span class="badge badge-req">Obrig.</span></td><td>Código do agente financeiro</td></tr>
+          <tr><td><code>cdFundo</code></td><td>int</td><td><span class="badge badge-opt">Opt.</span></td><td>Código do fundo (-1 = todos, padrão -1)</td></tr>
+        </tbody>
+      </table>
+      <div class="label">Resposta 200</div>
+      <div class="resp-box">[
+  { "cdPrograma": 1, "nmPrograma": "PRONAMPE", "cdFundo": 2 },
+  { "cdPrograma": 42, "nmPrograma": "PRONAMPE SOLIDARIO RS", "cdFundo": 2 }
+]</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     GRUPO: PAINEL — KPIs
+═══════════════════════════════════════════════════════════ -->
+<div class="group">
+  <div class="group-title">Painel — KPIs <span class="group-sub">DB2D4W.CTRA_FNDO_GRTR / DB2D4W.DETT_OPR_PND / DB2GFG.RMS_AGT_FNCO</span></div>
+
+  <!-- EP 3 -->
+  <div class="endpoint" id="painel-info">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/painel/informacoes-gerais</span>
+      <span class="ep-summary">KPIs gerais do agente</span>
+    </div>
+    <div class="ep-body">
+      <div class="db-tag">DB2D4W.CTRA_FNDO_GRTR · DT_REF=MAX</div>
+      <p class="ep-desc">Retorna: mutuários (COUNT DISTINCT CD_IDFR_SRF), operações (COUNT), saldo contratado (SUM VL_OPR_CRD), ticket médio (AVG VL_OPR_CRD), saldo carteira (SUM VL_SDO_CPTL_NMLD).</p>
+      <div class="label">Parâmetros</div>
+      <table>
+        <thead><tr><th>Param</th><th>Tipo</th><th>Obrig.</th><th>Descrição</th></tr></thead>
+        <tbody>
+          <tr><td><code>cdAgtFnco</code></td><td>int</td><td><span class="badge badge-req">Obrig.</span></td><td>Código do agente</td></tr>
+          <tr><td><code>cdFundo</code></td><td>int</td><td><span class="badge badge-opt">Opt.</span></td><td>Filtro fundo (-1 = todos)</td></tr>
+          <tr><td><code>cdPrograma</code></td><td>int</td><td><span class="badge badge-opt">Opt.</span></td><td>Filtro programa (-1 = todos)</td></tr>
+        </tbody>
+      </table>
+      <div class="label">Resposta 200</div>
+      <div class="resp-box">{
+  "mutuarios": 12450,
+  "operacoes": 18700,
+  "saldoContratado": 4500000000.00,
+  "ticketMedio": 240641.71,
+  "saldoCarteira": 3850000000.00
+}</div>
+    </div>
+  </div>
+
+  <!-- EP 4 -->
+  <div class="endpoint" id="painel-inad">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/painel/inadimplencia</span>
+      <span class="ep-summary">Dados de inadimplência</span>
+    </div>
+    <div class="ep-body">
+      <div class="db-tag">DB2D4W.CTRA_FNDO_GRTR · VL_SDO_CPTL_ATR / VL_SDO_CPTL_NMLD</div>
+      <p class="ep-desc">Saldo atrasado (SUM VL_SDO_CPTL_ATR), índice por saldo (atrasado/normalizado×100), índice por operações (ops com atraso/total×100).</p>
+      <div class="label">Parâmetros</div>
+      <table>
+        <thead><tr><th>Param</th><th>Tipo</th><th>Obrig.</th><th>Descrição</th></tr></thead>
+        <tbody>
+          <tr><td><code>cdAgtFnco</code></td><td>int</td><td><span class="badge badge-req">Obrig.</span></td><td>Código do agente</td></tr>
+          <tr><td><code>cdFundo</code></td><td>int</td><td><span class="badge badge-opt">Opt.</span></td><td>Filtro fundo (-1 = todos)</td></tr>
+          <tr><td><code>cdPrograma</code></td><td>int</td><td><span class="badge badge-opt">Opt.</span></td><td>Filtro programa (-1 = todos)</td></tr>
+        </tbody>
+      </table>
+      <div class="label">Resposta 200</div>
+      <div class="resp-box">{
+  "saldoAtrasado": 125000000.00,
+  "indiceInadimplenciaSaldo": 3.2468,
+  "indiceInadimplenciaOperacoes": 2.8910
+}</div>
+    </div>
+  </div>
+
+  <!-- EP 5 -->
+  <div class="endpoint" id="painel-ivh">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/painel/ivh</span>
+      <span class="ep-summary">Tabela IVH por programa</span>
+    </div>
+    <div class="ep-body">
+      <div class="db-tag">DB2D4W.CTRA_FNDO_GRTR · VL_MVTC_HNR_GRT / VL_GRT_OPR_AJSD</div>
+      <p class="ep-desc">IVH = (VL_HONRADOS / VL_CONTRATADO) × 100. Agrupado por programa. Campos: coberturaMedia (AVG PC_GRT_OPR_CRD), vlHonrados (SUM honrados - devolvidos), vlRecuperados, vlContratado (SUM VL_GRT_OPR_AJSD), ivh (calculado).</p>
+      <div class="label">Parâmetros</div>
+      <table>
+        <thead><tr><th>Param</th><th>Tipo</th><th>Obrig.</th><th>Descrição</th></tr></thead>
+        <tbody>
+          <tr><td><code>cdAgtFnco</code></td><td>int</td><td><span class="badge badge-req">Obrig.</span></td><td>Código do agente</td></tr>
+          <tr><td><code>cdFundo</code></td><td>int</td><td><span class="badge badge-opt">Opt.</span></td><td>Filtro fundo (-1 = todos)</td></tr>
+        </tbody>
+      </table>
+      <div class="label">Resposta 200</div>
+      <div class="resp-box">[
+  {
+    "cdPrograma": "1",
+    "nmPrograma": "PRONAMPE",
+    "coberturaMedia": 80.0000,
+    "vlHonrados": 52000000.00,
+    "vlRecuperados": 8000000.00,
+    "vlContratado": 1800000000.00,
+    "ivh": 2.8889
+  }
+]</div>
+    </div>
+  </div>
+
+  <!-- EP 6 -->
+  <div class="endpoint" id="painel-ivh-serie">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/painel/ivh/serie-historica</span>
+      <span class="ep-summary">Série histórica do IVH</span>
+    </div>
+    <div class="ep-body">
+      <div class="db-tag">DB2D4W.CTRA_FNDO_GRTR · YEAR/MONTH(DT_FRMZ_OPR)</div>
+      <p class="ep-desc">Evolução mensal do IVH. IVH mensal = (SUM VL_GRT / SUM VL_OPR) × 100 por mês/ano de DT_FRMZ_OPR.</p>
+      <div class="label">Parâmetros</div>
+      <table>
+        <thead><tr><th>Param</th><th>Tipo</th><th>Obrig.</th><th>Descrição</th></tr></thead>
+        <tbody>
+          <tr><td><code>cdAgtFnco</code></td><td>int</td><td><span class="badge badge-req">Obrig.</span></td><td>Código do agente</td></tr>
+          <tr><td><code>cdFundo</code></td><td>int</td><td><span class="badge badge-opt">Opt.</span></td><td>Filtro fundo (-1 = todos)</td></tr>
+        </tbody>
+      </table>
+      <div class="label">Resposta 200</div>
+      <div class="resp-box">{
+  "series": [
+    { "periodo": "2024-01", "ivh": 1.2300 },
+    { "periodo": "2024-02", "ivh": 1.4500 },
+    { "periodo": "2024-03", "ivh": 1.8900 }
+  ]
+}</div>
+    </div>
+  </div>
+
+  <!-- EP 7 -->
+  <div class="endpoint" id="painel-remessas">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/painel/remessas/resumo</span>
+      <span class="ep-summary">Resumo de remessas</span>
+    </div>
+    <div class="ep-body">
+      <div class="db-tag">DB2GFG.RMS_AGT_FNCO · GROUP BY CD_TIP_EST_RMS</div>
+      <p class="ep-desc">Contagem de remessas por status. Total = soma de todos os status. Concluídas = status 3. Não movimentadas = status 1 + 2.</p>
+      <div class="label">Parâmetros</div>
+      <table>
+        <thead><tr><th>Param</th><th>Tipo</th><th>Obrig.</th><th>Descrição</th></tr></thead>
+        <tbody>
+          <tr><td><code>cdAgtFnco</code></td><td>int</td><td><span class="badge badge-req">Obrig.</span></td><td>Código do agente</td></tr>
+          <tr><td><code>cdFundo</code></td><td>int</td><td><span class="badge badge-opt">Opt.</span></td><td>Filtro fundo (-1 = todos)</td></tr>
+        </tbody>
+      </table>
+      <div class="label">Resposta 200</div>
+      <div class="resp-box">{
+  "total": 248,
+  "naoMovimentadas": 18,
+  "concluidas": 220
+}</div>
+    </div>
+  </div>
+
+  <!-- EP 8 -->
+  <div class="endpoint" id="painel-pendencias">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/painel/pendencias/resumo</span>
+      <span class="ep-summary">Resumo de pendências agrupado por tipo</span>
+    </div>
+    <div class="ep-body">
+      <div class="db-tag">DB2D4W.DETT_OPR_PND · GROUP BY NM_TIP_PNC_OPR_CRD</div>
+      <p class="ep-desc">Agrega pendências por tipo (campo NM_TIP_PNC_OPR_CRD da tabela analítica). Retorna lista de grupos com tipo, label e quantidade.</p>
+      <div class="label">Parâmetros</div>
+      <table>
+        <thead><tr><th>Param</th><th>Tipo</th><th>Obrig.</th><th>Descrição</th></tr></thead>
+        <tbody>
+          <tr><td><code>cdAgtFnco</code></td><td>int</td><td><span class="badge badge-req">Obrig.</span></td><td>Código do agente</td></tr>
+          <tr><td><code>cdFundo</code></td><td>int</td><td><span class="badge badge-opt">Opt.</span></td><td>Filtro fundo (-1 = todos)</td></tr>
+        </tbody>
+      </table>
+      <div class="label">Resposta 200</div>
+      <div class="resp-box">{
+  "grupos": [
+    { "tipo": "DOCUMENTACAO_INCOMPLETA", "label": "DOCUMENTACAO_INCOMPLETA", "valor": 142 },
+    { "tipo": "INADIMPLENCIA_REGISTRADA", "label": "INADIMPLENCIA_REGISTRADA", "valor": 87 }
+  ]
+}</div>
+    </div>
+  </div>
+
+  <!-- EP 9 -->
+  <div class="endpoint" id="painel-movim">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/painel/movimentacao-financeira/serie-historica</span>
+      <span class="ep-summary">Série histórica de movimentação financeira</span>
+    </div>
+    <div class="ep-body">
+      <div class="db-tag">DB2GFG.RMS_AGT_FNCO (carteiraAgente) + DB2D4W.CTRA_FNDO_GRTR (carteiraFundo)</div>
+      <p class="ep-desc">Evolução mensal em dois eixos: carteira do agente (SUM VL_LQDO_MVTC_RMS de CD_TIP_NTZ_MVTC IN (1,2) por mês DT_MVTC_FNCR) e carteira do fundo (SUM VL_SDO_CPTL_NMLD por mês DT_FRMZ_OPR).</p>
+      <div class="label">Parâmetros</div>
+      <table>
+        <thead><tr><th>Param</th><th>Tipo</th><th>Obrig.</th><th>Descrição</th></tr></thead>
+        <tbody>
+          <tr><td><code>cdAgtFnco</code></td><td>int</td><td><span class="badge badge-req">Obrig.</span></td><td>Código do agente</td></tr>
+          <tr><td><code>cdFundo</code></td><td>int</td><td><span class="badge badge-opt">Opt.</span></td><td>Filtro fundo (-1 = todos)</td></tr>
+        </tbody>
+      </table>
+      <div class="label">Resposta 200</div>
+      <div class="resp-box">{
+  "series": [
+    { "periodo": "2024-01", "carteiraAgente": 185000000.00, "carteiraFundo": 3200000000.00 },
+    { "periodo": "2024-02", "carteiraAgente": 210000000.00, "carteiraFundo": 3350000000.00 }
+  ]
+}</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     GRUPO: OPERAÇÕES
+═══════════════════════════════════════════════════════════ -->
+<div class="group">
+  <div class="group-title">Operações de Crédito <span class="group-sub">DB2D4W.CTRA_FNDO_GRTR · BASE_ANL_OPR BI (custo 261.810)</span></div>
+
+  <!-- EP 10 -->
+  <div class="endpoint" id="op-lista">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/operacoes</span>
+      <span class="ep-summary">Lista operações paginadas</span>
+    </div>
+    <div class="ep-body">
+      <div class="db-tag">DB2D4W.CTRA_FNDO_GRTR · DT_REF=MAX · ORDER BY DT_FRMZ_OPR DESC</div>
+      <p class="ep-desc">Operações de crédito do snapshot mais recente. Inclui lógica Pronampe Solidário RS 1 (nov-dez/2023) e RS 2 (mai-dez/2024). Filtro nrContrato usa LIKE <code>%valor%</code>.</p>
+      <div class="label">Parâmetros</div>
+      <table>
+        <thead><tr><th>Param</th><th>Tipo</th><th>Padrão</th><th>Descrição</th></tr></thead>
+        <tbody>
+          <tr><td><code>cdAgtFnco</code></td><td>int</td><td>—</td><td><span class="badge badge-req">Obrig.</span> Código do agente</td></tr>
+          <tr><td><code>cdFundo</code></td><td>int</td><td>-1</td><td>Filtro fundo (-1 = todos)</td></tr>
+          <tr><td><code>cdPrograma</code></td><td>int</td><td>-1</td><td>Filtro programa (-1 = todos)</td></tr>
+          <tr><td><code>nrContrato</code></td><td>string</td><td>null</td><td>Filtro LIKE no CD_IDFR_EXNO_OPR</td></tr>
+          <tr><td><code>page</code></td><td>int</td><td>0</td><td>Página (0-based)</td></tr>
+          <tr><td><code>size</code></td><td>int</td><td>100</td><td>Tamanho: 10, 50 ou 100</td></tr>
+        </tbody>
+      </table>
+      <div class="label">Resposta 200</div>
+      <div class="resp-box">{
+  "content": [
+    {
+      "nmFundo": "FGI",
+      "nmPrograma": "PRONAMPE",
+      "nrOperacao": "0001234-56.2023.0.00.0000",
+      "publicoAlvo": "MICROEMPRESA",
+      "estadoOperacao": "ATIVO",
+      "dataFormal": "2023-03-15",
+      "dataVencimento": "2026-03-15",
+      "valorOperacao": 150000.00,
+      "valorLiberado": 148500.00
+    }
+  ],
+  "page": 0,
+  "size": 100,
+  "totalElements": 18700,
+  "totalPages": 187
+}</div>
+    </div>
+  </div>
+
+  <!-- EP 11 -->
+  <div class="endpoint" id="op-exportar">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/operacoes/exportar</span>
+      <span class="ep-summary">Exporta operações em CSV</span>
+    </div>
+    <div class="ep-body">
+      <p class="ep-desc">Retorna todas as operações (sem paginação) em <strong>text/csv</strong>. Content-Disposition: attachment; filename="operacoes.csv".</p>
+      <div class="label">Colunas CSV</div>
+      <div class="resp-box">FUNDO;PROGRAMA;NR_OPERACAO;PUBLICO_ALVO;ESTADO_OPERACAO;DATA_FORMALIZACAO;DATA_VENCIMENTO;VALOR_OPERACAO;VALOR_LIBERADO</div>
+      <br>
+      <div class="label">Parâmetros (mesmos do endpoint 10, sem page/size)</div>
+      <div class="resp-box">cdAgtFnco (obrig.) · cdFundo · cdPrograma · nrContrato</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     GRUPO: REMESSAS
+═══════════════════════════════════════════════════════════ -->
+<div class="group">
+  <div class="group-title">Remessas <span class="group-sub">DB2GFG.RMS_AGT_FNCO · REMESSAS BI (custo 2.223)</span></div>
+
+  <!-- EP 12 -->
+  <div class="endpoint" id="rem-sit">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/remessas/filtros/situacoes</span>
+      <span class="ep-summary">Situações de remessa para filtro</span>
+    </div>
+    <div class="ep-body">
+      <p class="ep-desc">Retorna lista estática de situações. Sem parâmetros.</p>
+      <div class="label">Resposta 200</div>
+      <div class="resp-box">[
+  { "codigo": "1", "label": "Recebida" },
+  { "codigo": "2", "label": "Em Processamento" },
+  { "codigo": "3", "label": "Processada" },
+  { "codigo": "4", "label": "Rejeitada" },
+  { "codigo": "5", "label": "Cancelada" }
+]</div>
+    </div>
+  </div>
+
+  <!-- EP 13 -->
+  <div class="endpoint" id="rem-mot">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/remessas/filtros/motivos-rejeicao</span>
+      <span class="ep-summary">Motivos de rejeição para filtro</span>
+    </div>
+    <div class="ep-body">
+      <p class="ep-desc">Retorna lista estática de motivos de rejeição. Sem parâmetros.</p>
+      <div class="label">Resposta 200</div>
+      <div class="resp-box">[
+  { "codigo": "0", "label": "Sem Rejeição" },
+  { "codigo": "1", "label": "Conteúdo Inválido" }
+]</div>
+    </div>
+  </div>
+
+  <!-- EP 14 -->
+  <div class="endpoint" id="rem-lista">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/remessas</span>
+      <span class="ep-summary">Lista remessas paginadas</span>
+    </div>
+    <div class="ep-body">
+      <div class="db-tag">DB2GFG.RMS_AGT_FNCO · CD_FNDO_GRTR &lt;&gt; 1 · QT_REG_ACT via EVT_OPR_R3TD</div>
+      <p class="ep-desc">Remessas do agente. <strong>QT_REG_ACT</strong>: quando CD_TIP_EST_RMS IN (5,6) = QT_REG_RMS - 2 - COUNT(EVT_OPR_R3TD). <strong>QF_RMS_RJC</strong>: COUNT(EVT_OPR_R3TD). Campo <strong>referencia</strong> formatado como MM/yyyy.</p>
+      <div class="label">Parâmetros</div>
+      <table>
+        <thead><tr><th>Param</th><th>Tipo</th><th>Padrão</th><th>Descrição</th></tr></thead>
+        <tbody>
+          <tr><td><code>cdAgtFnco</code></td><td>int</td><td>—</td><td><span class="badge badge-req">Obrig.</span> Código do agente</td></tr>
+          <tr><td><code>cdFundo</code></td><td>int</td><td>-1</td><td>Filtro fundo (-1 = todos)</td></tr>
+          <tr><td><code>situacao</code></td><td>int</td><td>-1</td><td>CD_TIP_EST_RMS (-1 = todas)</td></tr>
+          <tr><td><code>motivoRejeicao</code></td><td>int</td><td>-1</td><td>CD_MTV_RJC_RMS (-1 = todos)</td></tr>
+          <tr><td><code>nrSequencial</code></td><td>Short</td><td>null</td><td>NR_SEQL_RMS exato</td></tr>
+          <tr><td><code>page</code></td><td>int</td><td>0</td><td>Página (0-based)</td></tr>
+          <tr><td><code>size</code></td><td>int</td><td>100</td><td>Tamanho: 10, 50 ou 100</td></tr>
+        </tbody>
+      </table>
+      <div class="label">Resposta 200</div>
+      <div class="resp-box">{
+  "content": [
+    {
+      "referencia": "03/2024",
+      "dataHoraRecebimento": "2024-03-15T09:32:00",
+      "nrSequencial": 1045,
+      "agenteFinanceiro": "BB",
+      "nmFundo": "FGI",
+      "situacao": "Processada",
+      "motivoRejeicao": null,
+      "qtdeRegistros": 850,
+      "registrosAceitos": 848,
+      "registrosRecusados": 2
+    }
+  ],
+  "page": 0,
+  "size": 100,
+  "totalElements": 248,
+  "totalPages": 3
+}</div>
+    </div>
+  </div>
+
+  <!-- EP 15 -->
+  <div class="endpoint" id="rem-exportar">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/remessas/exportar</span>
+      <span class="ep-summary">Exporta remessas em CSV</span>
+    </div>
+    <div class="ep-body">
+      <p class="ep-desc">Todas as remessas (sem paginação) em <strong>text/csv</strong>. Content-Disposition: attachment; filename="remessas.csv".</p>
+      <div class="label">Colunas CSV</div>
+      <div class="resp-box">REFERENCIA;DATA_HORA_RECEBIMENTO;NR_SEQUENCIAL;AGENTE;FUNDO;SITUACAO;MOTIVO_REJEICAO;QT_REGISTROS;REGISTROS_ACEITOS;REGISTROS_RECUSADOS</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     GRUPO: MOVIMENTAÇÕES
+═══════════════════════════════════════════════════════════ -->
+<div class="group">
+  <div class="group-title">Movimentações Financeiras <span class="group-sub">DB2GFG.RMS_AGT_FNCO · MVTC_FNCR BI (custo 734) · CD_TIP_NTZ_MVTC IN (1,2)</span></div>
+
+  <!-- EP 16 -->
+  <div class="endpoint" id="mov-sit">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/movimentacoes/filtros/situacoes-remessa</span>
+      <span class="ep-summary">Situações de remessa para filtro de movimentações</span>
+    </div>
+    <div class="ep-body">
+      <p class="ep-desc">Retorna lista estática de situações de remessa. Sem parâmetros.</p>
+      <div class="label">Resposta 200</div>
+      <div class="resp-box">[
+  { "codigo": "1", "label": "Recebida" },
+  { "codigo": "2", "label": "Em Processamento" },
+  { "codigo": "3", "label": "Processada" },
+  { "codigo": "4", "label": "Rejeitada" },
+  { "codigo": "5", "label": "Cancelada" }
+]</div>
+    </div>
+  </div>
+
+  <!-- EP 17 -->
+  <div class="endpoint" id="mov-lista">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/movimentacoes</span>
+      <span class="ep-summary">Lista movimentações paginadas</span>
+    </div>
+    <div class="ep-body">
+      <div class="db-tag">DB2GFG.RMS_AGT_FNCO · CD_TIP_NTZ_MVTC IN (1,2) · ORDER BY DT_PRCT_EVT DESC</div>
+      <p class="ep-desc">Movimentações financeiras (crédito do fundo=1 e crédito do agente=2). Campos de data: DT_PRCT_EVT (proc. remessa), DT_ATL_MNTR (atualiz. monetária), DT_MVTC_FNCR (movimentação). Valor: VL_LQDO_MVTC_RMS.</p>
+      <div class="label">Parâmetros</div>
+      <table>
+        <thead><tr><th>Param</th><th>Tipo</th><th>Padrão</th><th>Descrição</th></tr></thead>
+        <tbody>
+          <tr><td><code>cdAgtFnco</code></td><td>int</td><td>—</td><td><span class="badge badge-req">Obrig.</span> Código do agente</td></tr>
+          <tr><td><code>cdFundo</code></td><td>int</td><td>-1</td><td>Filtro fundo (-1 = todos)</td></tr>
+          <tr><td><code>situacaoRemessa</code></td><td>int</td><td>-1</td><td>CD_TIP_EST_RMS (-1 = todas)</td></tr>
+          <tr><td><code>nrSequencial</code></td><td>Short</td><td>null</td><td>NR_SEQL_RMS exato</td></tr>
+          <tr><td><code>page</code></td><td>int</td><td>0</td><td>Página (0-based)</td></tr>
+          <tr><td><code>size</code></td><td>int</td><td>100</td><td>Tamanho: 10, 50 ou 100</td></tr>
+        </tbody>
+      </table>
+      <div class="label">Resposta 200</div>
+      <div class="resp-box">{
+  "content": [
+    {
+      "nmFundo": "FGI",
+      "nrSequencialRemessa": 1045,
+      "tipoMovFinanceira": "Crédito do Fundo",
+      "situacaoMovFinanceira": "Processada",
+      "situacaoRemessa": "Processada",
+      "dataProcRemessa": "2024-03-15",
+      "dataAtualMonetaria": "2024-03-16",
+      "dataMovFinanceira": "2024-03-17",
+      "qtdeRegistrosRemessa": 850,
+      "valorLiqMovimentado": 185000000.00
+    }
+  ],
+  "page": 0,
+  "size": 100,
+  "totalElements": 1240,
+  "totalPages": 13
+}</div>
+    </div>
+  </div>
+
+  <!-- EP 18 -->
+  <div class="endpoint" id="mov-detalhe">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/movimentacoes/{nrSequencial}/detalhe</span>
+      <span class="ep-summary">Detalhe de uma movimentação</span>
+    </div>
+    <div class="ep-body">
+      <div class="db-tag">DB2GFG.RSM_MVTC_FNCR_RMS JOIN RMS_AGT_FNCO JOIN TIP_MVTC_FNCR · DET_MVT_FNCR BI</div>
+      <p class="ep-desc">Breakdown por tipo de movimentação financeira (tabela <strong>RSM_MVTC_FNCR_RMS</strong>) de uma remessa específica. <strong>Path param</strong>: NR_SEQL_RMS da remessa.</p>
+      <div class="label">Parâmetros</div>
+      <table>
+        <thead><tr><th>Param</th><th>Tipo</th><th>Obrig.</th><th>Descrição</th></tr></thead>
+        <tbody>
+          <tr><td><code>{nrSequencial}</code> (path)</td><td>short</td><td><span class="badge badge-req">Obrig.</span></td><td>NR_SEQL_RMS da remessa</td></tr>
+          <tr><td><code>cdAgtFnco</code></td><td>int</td><td><span class="badge badge-req">Obrig.</span></td><td>Código do agente (query param)</td></tr>
+        </tbody>
+      </table>
+      <div class="label">Resposta 200</div>
+      <div class="resp-box">[
+  {
+    "tipoMovimentacao": "HONRA",
+    "valorMovimentado": 520000.00
+  },
+  {
+    "tipoMovimentacao": "RECUPERACAO",
+    "valorMovimentado": 80000.00
+  }
+]</div>
+    </div>
+  </div>
+
+  <!-- EP 19 -->
+  <div class="endpoint" id="mov-exportar">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/movimentacoes/exportar</span>
+      <span class="ep-summary">Exporta movimentações em CSV</span>
+    </div>
+    <div class="ep-body">
+      <p class="ep-desc">Todas as movimentações (sem paginação) em <strong>text/csv</strong>. Content-Disposition: attachment; filename="movimentacoes.csv".</p>
+      <div class="label">Colunas CSV</div>
+      <div class="resp-box">FUNDO;NR_SEQUENCIAL;TIPO_MOV_FIN;SITUACAO_MOV;SITUACAO_REMESSA;DT_PROC_REMESSA;DT_ATUAL_MONETARIA;DT_MOV_FINANCEIRA;QT_REGISTROS;VL_LIQ_MOVIMENTADO</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     GRUPO: PENDÊNCIAS
+═══════════════════════════════════════════════════════════ -->
+<div class="group">
+  <div class="group-title">Pendências <span class="group-sub">DB2D4W.DETT_OPR_PND · PENDENCIAS BI (custo 48.472)</span></div>
+
+  <!-- EP 20 -->
+  <div class="endpoint" id="pend-filtros">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/pendencias/filtros/tipos</span>
+      <span class="ep-summary">Tipos de pendência para filtro</span>
+    </div>
+    <div class="ep-body">
+      <div class="db-tag">DB2D4W.DETT_OPR_PND · NM_TIP_PNC_OPR_CRD DISTINCT</div>
+      <p class="ep-desc">Retorna os tipos de pendência disponíveis. O valor <code>tipoPendencia</code> dos outros endpoints deve ser o texto exato retornado aqui (campo NM_TIP_PNC_OPR_CRD da tabela).</p>
+      <div class="label">Resposta 200</div>
+      <div class="resp-box">[
+  { "codigo": "DOCUMENTACAO_INCOMPLETA", "label": "DOCUMENTACAO_INCOMPLETA" },
+  { "codigo": "INADIMPLENCIA_REGISTRADA", "label": "INADIMPLENCIA_REGISTRADA" },
+  { "codigo": "VENCIMENTO_PROXIMO", "label": "VENCIMENTO_PROXIMO" }
+]</div>
+    </div>
+  </div>
+
+  <!-- EP 21 -->
+  <div class="endpoint" id="pend-lista">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/pendencias</span>
+      <span class="ep-summary">Lista pendências paginadas</span>
+    </div>
+    <div class="ep-body">
+      <div class="db-tag">DB2D4W.DETT_OPR_PND · CD_FNDO_GRTR &lt;&gt; 1 · ORDER BY DT_SNC_PHC ASC</div>
+      <p class="ep-desc">Pendências da tabela analítica. Campo <strong>tipoPendencia</strong>: match exato no texto de NM_TIP_PNC_OPR_CRD. Campo <strong>dataInicioPendencia</strong>: DT_SNC_PHC.</p>
+      <div class="label">Parâmetros</div>
+      <table>
+        <thead><tr><th>Param</th><th>Tipo</th><th>Padrão</th><th>Descrição</th></tr></thead>
+        <tbody>
+          <tr><td><code>cdAgtFnco</code></td><td>int</td><td>—</td><td><span class="badge badge-req">Obrig.</span> Código do agente</td></tr>
+          <tr><td><code>cdFundo</code></td><td>int</td><td>-1</td><td>Filtro fundo (-1 = todos)</td></tr>
+          <tr><td><code>cdPrograma</code></td><td>int</td><td>-1</td><td>Filtro programa (-1 = todos)</td></tr>
+          <tr><td><code>tipoPendencia</code></td><td>string</td><td>null</td><td>Texto exato de NM_TIP_PNC_OPR_CRD</td></tr>
+          <tr><td><code>page</code></td><td>int</td><td>0</td><td>Página (0-based)</td></tr>
+          <tr><td><code>size</code></td><td>int</td><td>100</td><td>Tamanho: 10, 50 ou 100</td></tr>
+        </tbody>
+      </table>
+      <div class="label">Resposta 200</div>
+      <div class="resp-box">{
+  "content": [
+    {
+      "nmFundo": "FGI",
+      "nmPrograma": "PRONAMPE",
+      "nrContrato": "0001234-56.2023.0.00.0000",
+      "situacaoContrato": "3",
+      "tipoPendencia": "DOCUMENTACAO_INCOMPLETA",
+      "dataInicioPendencia": "2024-01-10"
+    }
+  ],
+  "page": 0,
+  "size": 100,
+  "totalElements": 229,
+  "totalPages": 3
+}</div>
+    </div>
+  </div>
+
+  <!-- EP 22 -->
+  <div class="endpoint" id="pend-exportar">
+    <div class="ep-header">
+      <span class="method GET">GET</span>
+      <span class="ep-path">/api/v1/pendencias/exportar</span>
+      <span class="ep-summary">Exporta pendências em CSV</span>
+    </div>
+    <div class="ep-body">
+      <p class="ep-desc">Todas as pendências (sem paginação) em <strong>text/csv</strong>. Content-Disposition: attachment; filename="pendencias.csv".</p>
+      <div class="label">Colunas CSV</div>
+      <div class="resp-box">FUNDO;PROGRAMA;NR_CONTRATO;SITUACAO_CONTRATO;TIPO_PENDENCIA;DATA_INICIO_PENDENCIA</div>
+    </div>
+  </div>
+</div>
+
+<p style="text-align:center; color:#aaa; font-size:12px; padding: 24px 0;">
+  Painel Agentes FGO · Gerado em 2026-05-22 · Quarkus 3.x + IBM DB2 + Redis Sentinel
+</p>
+</div>
+</body>
+</html>
