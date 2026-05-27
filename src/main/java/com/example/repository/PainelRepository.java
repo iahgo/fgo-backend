@@ -1,16 +1,11 @@
 package com.example.repository;
 
-import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
+import jakarta.transaction.Transactional;
 import org.jboss.logging.Logger;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -36,7 +31,7 @@ public class PainelRepository {
             "(SELECT MAX(Y.DT_REF) FROM DB2D4W.CTRA_FNDO_GRTR Y)";
 
     @Inject
-    AgroalDataSource dataSource;
+    EntityManager em;
 
     // =========================================================================
     // FUNDOS — fundos com operações para o agente
@@ -46,6 +41,7 @@ public class PainelRepository {
      * Retorna os fundos garantidores com operações do agente (DT_REF mais recente).
      * Retorna Object[]{cdFndoGrtr (int), nmFndoGrtr (String)}.
      */
+    @Transactional(Transactional.TxType.REQUIRED)
     @SuppressWarnings("unchecked")
     public List<Object[]> buscarFundosPorAgente(int cdAgtFnco) {
         LOG.debugf("[PAINEL] buscarFundosPorAgente agente=%d", cdAgtFnco);
@@ -58,15 +54,9 @@ public class PainelRepository {
             + "  AND A.CD_AGT_FNCO = ? "
             + "ORDER BY D.NM_FNDO_GRTR";
 
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, cdAgtFnco);
-            try (ResultSet rs = ps.executeQuery()) {
-                return toListOfArrays(rs);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao buscar fundos por agente", e);
-        }
+        return em.createNativeQuery(sql)
+                .setParameter(1, cdAgtFnco)
+                .getResultList();
     }
 
     // =========================================================================
@@ -78,6 +68,7 @@ public class PainelRepository {
      * cdFundo = -1 indica "todos os fundos".
      * Retorna Object[]{cdTipPgmCrd (int), nmTipPgmCrd (String), cdFndoGrtr (int)}.
      */
+    @Transactional(Transactional.TxType.REQUIRED)
     @SuppressWarnings("unchecked")
     public List<Object[]> buscarProgramasPorAgente(int cdAgtFnco, int cdFundo) {
         LOG.debugf("[PAINEL] buscarProgramasPorAgente agente=%d fundo=%d", cdAgtFnco, cdFundo);
@@ -102,17 +93,11 @@ public class PainelRepository {
             + "  AND (? = -1 OR A.CD_FNDO_GRTR = ?) "
             + "ORDER BY 2";
 
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, cdAgtFnco);
-            ps.setInt(2, cdFundo);
-            ps.setInt(3, cdFundo);
-            try (ResultSet rs = ps.executeQuery()) {
-                return toListOfArrays(rs);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao buscar programas por agente", e);
-        }
+        return em.createNativeQuery(sql)
+                .setParameter(1, cdAgtFnco)
+                .setParameter(2, cdFundo)
+                .setParameter(3, cdFundo)
+                .getResultList();
     }
 
     // =========================================================================
@@ -124,6 +109,7 @@ public class PainelRepository {
      * Retorna Object[]{mutuarios (Long), operacoes (Long), vlOprCrdSum (BigDecimal),
      *                   vlOprCrdAvg (BigDecimal), vlSdoCptlNmldSum (BigDecimal)}.
      */
+    @Transactional(Transactional.TxType.REQUIRED)
     public Object[] buscarInformacoesGerais(int cdAgtFnco, int cdFundo, int cdPrograma) {
         LOG.debugf("[PAINEL] buscarInformacoesGerais agente=%d fundo=%d prog=%d", cdAgtFnco, cdFundo, cdPrograma);
 
@@ -139,22 +125,13 @@ public class PainelRepository {
             + "  AND (? = -1 OR A.CD_FNDO_GRTR = ?) "
             + "  AND (? = -1 OR A.CD_TIP_PGM_CRD = ?)";
 
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, cdAgtFnco);
-            ps.setInt(2, cdFundo);
-            ps.setInt(3, cdFundo);
-            ps.setInt(4, cdPrograma);
-            ps.setInt(5, cdPrograma);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return toArray(rs);
-                }
-                return new Object[5];
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao buscar informações gerais", e);
-        }
+        return (Object[]) em.createNativeQuery(sql)
+                .setParameter(1, cdAgtFnco)
+                .setParameter(2, cdFundo)
+                .setParameter(3, cdFundo)
+                .setParameter(4, cdPrograma)
+                .setParameter(5, cdPrograma)
+                .getSingleResult();
     }
 
     // =========================================================================
@@ -165,6 +142,7 @@ public class PainelRepository {
      * Dados de inadimplência: saldo atrasado, saldo nominal, total ops, ops com atraso.
      * Retorna Object[]{saldoAtr (BigDecimal), saldoNmld (BigDecimal), totalOps (Long), opsComAtr (Long)}.
      */
+    @Transactional(Transactional.TxType.REQUIRED)
     public Object[] buscarInadimplencia(int cdAgtFnco, int cdFundo, int cdPrograma) {
         LOG.debugf("[PAINEL] buscarInadimplencia agente=%d fundo=%d prog=%d", cdAgtFnco, cdFundo, cdPrograma);
 
@@ -179,22 +157,13 @@ public class PainelRepository {
             + "  AND (? = -1 OR A.CD_FNDO_GRTR = ?) "
             + "  AND (? = -1 OR A.CD_TIP_PGM_CRD = ?)";
 
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, cdAgtFnco);
-            ps.setInt(2, cdFundo);
-            ps.setInt(3, cdFundo);
-            ps.setInt(4, cdPrograma);
-            ps.setInt(5, cdPrograma);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return toArray(rs);
-                }
-                return new Object[4];
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao buscar inadimplência", e);
-        }
+        return (Object[]) em.createNativeQuery(sql)
+                .setParameter(1, cdAgtFnco)
+                .setParameter(2, cdFundo)
+                .setParameter(3, cdFundo)
+                .setParameter(4, cdPrograma)
+                .setParameter(5, cdPrograma)
+                .getSingleResult();
     }
 
     // =========================================================================
@@ -206,6 +175,7 @@ public class PainelRepository {
      *
      * Retorna Object[]{cdTipPgmCrd, nmTipPgmCrd, coberturaMedia, vlHonrados, vlRecuperados, vlContratado}.
      */
+    @Transactional(Transactional.TxType.REQUIRED)
     @SuppressWarnings("unchecked")
     public List<Object[]> buscarIvhPorPrograma(int cdAgtFnco, int cdFundo) {
         LOG.debugf("[PAINEL] buscarIvhPorPrograma agente=%d fundo=%d", cdAgtFnco, cdFundo);
@@ -245,17 +215,11 @@ public class PainelRepository {
             + "       END "
             + "ORDER BY 2";
 
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, cdAgtFnco);
-            ps.setInt(2, cdFundo);
-            ps.setInt(3, cdFundo);
-            try (ResultSet rs = ps.executeQuery()) {
-                return toListOfArrays(rs);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao buscar IVH por programa", e);
-        }
+        return em.createNativeQuery(sql)
+                .setParameter(1, cdAgtFnco)
+                .setParameter(2, cdFundo)
+                .setParameter(3, cdFundo)
+                .getResultList();
     }
 
     // =========================================================================
@@ -266,6 +230,7 @@ public class PainelRepository {
      * Série histórica do IVH agrupada por ano/mês de DT_FRMZ_OPR.
      * Retorna Object[]{ano (Integer), mes (Integer), vlGrtOprAjsdSum (BigDecimal), vlOprCrdSum (BigDecimal)}.
      */
+    @Transactional(Transactional.TxType.REQUIRED)
     @SuppressWarnings("unchecked")
     public List<Object[]> buscarIvhSerieHistorica(int cdAgtFnco, int cdFundo) {
         LOG.debugf("[PAINEL] buscarIvhSerieHistorica agente=%d fundo=%d", cdAgtFnco, cdFundo);
@@ -283,17 +248,11 @@ public class PainelRepository {
             + "GROUP BY YEAR(A.DT_FRMZ_OPR), MONTH(A.DT_FRMZ_OPR) "
             + "ORDER BY YEAR(A.DT_FRMZ_OPR) ASC, MONTH(A.DT_FRMZ_OPR) ASC";
 
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, cdAgtFnco);
-            ps.setInt(2, cdFundo);
-            ps.setInt(3, cdFundo);
-            try (ResultSet rs = ps.executeQuery()) {
-                return toListOfArrays(rs);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao buscar IVH série histórica", e);
-        }
+        return em.createNativeQuery(sql)
+                .setParameter(1, cdAgtFnco)
+                .setParameter(2, cdFundo)
+                .setParameter(3, cdFundo)
+                .getResultList();
     }
 
     // =========================================================================
@@ -304,6 +263,7 @@ public class PainelRepository {
      * Resumo de remessas por status para o donut do painel.
      * Retorna Object[]{cdTipEstRms (short), qtd (Long)}.
      */
+    @Transactional(Transactional.TxType.REQUIRED)
     @SuppressWarnings("unchecked")
     public List<Object[]> buscarRemessasResumoPorStatus(int cdAgtFnco, int cdFundo) {
         LOG.debugf("[PAINEL] buscarRemessasResumoPorStatus agente=%d fundo=%d", cdAgtFnco, cdFundo);
@@ -316,17 +276,11 @@ public class PainelRepository {
             + "GROUP BY A.CD_TIP_EST_RMS "
             + "ORDER BY A.CD_TIP_EST_RMS";
 
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, cdAgtFnco);
-            ps.setInt(2, cdFundo);
-            ps.setInt(3, cdFundo);
-            try (ResultSet rs = ps.executeQuery()) {
-                return toListOfArrays(rs);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao buscar remessas resumo por status", e);
-        }
+        return em.createNativeQuery(sql)
+                .setParameter(1, cdAgtFnco)
+                .setParameter(2, cdFundo)
+                .setParameter(3, cdFundo)
+                .getResultList();
     }
 
     // =========================================================================
@@ -337,6 +291,7 @@ public class PainelRepository {
      * Dados de pendências agregados por tipo para o gráfico de barras do painel.
      * Retorna Object[]{nmTipPncOprCrd (String), qtd (Long)}.
      */
+    @Transactional(Transactional.TxType.REQUIRED)
     @SuppressWarnings("unchecked")
     public List<Object[]> buscarPendenciasAgregado(int cdAgtFnco, int cdFundo) {
         LOG.debugf("[PAINEL] buscarPendenciasAgregado agente=%d fundo=%d", cdAgtFnco, cdFundo);
@@ -351,17 +306,11 @@ public class PainelRepository {
             + "GROUP BY A.NM_TIP_PNC_OPR_CRD "
             + "ORDER BY COUNT(*) DESC";
 
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, cdAgtFnco);
-            ps.setInt(2, cdFundo);
-            ps.setInt(3, cdFundo);
-            try (ResultSet rs = ps.executeQuery()) {
-                return toListOfArrays(rs);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao buscar pendências agregado", e);
-        }
+        return em.createNativeQuery(sql)
+                .setParameter(1, cdAgtFnco)
+                .setParameter(2, cdFundo)
+                .setParameter(3, cdFundo)
+                .getResultList();
     }
 
     // =========================================================================
@@ -372,6 +321,7 @@ public class PainelRepository {
      * Série histórica de movimentação financeira líquida por mês (crédito do agente).
      * Retorna Object[]{ano (Integer), mes (Integer), vlLqdoMvtcRmsSum (BigDecimal)}.
      */
+    @Transactional(Transactional.TxType.REQUIRED)
     @SuppressWarnings("unchecked")
     public List<Object[]> buscarMovimentacaoSerie(int cdAgtFnco, int cdFundo) {
         LOG.debugf("[PAINEL] buscarMovimentacaoSerie agente=%d fundo=%d", cdAgtFnco, cdFundo);
@@ -388,23 +338,18 @@ public class PainelRepository {
             + "GROUP BY YEAR(A.DT_MVTC_FNCR), MONTH(A.DT_MVTC_FNCR) "
             + "ORDER BY YEAR(A.DT_MVTC_FNCR) ASC, MONTH(A.DT_MVTC_FNCR) ASC";
 
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, cdAgtFnco);
-            ps.setInt(2, cdFundo);
-            ps.setInt(3, cdFundo);
-            try (ResultSet rs = ps.executeQuery()) {
-                return toListOfArrays(rs);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao buscar movimentação série", e);
-        }
+        return em.createNativeQuery(sql)
+                .setParameter(1, cdAgtFnco)
+                .setParameter(2, cdFundo)
+                .setParameter(3, cdFundo)
+                .getResultList();
     }
 
     /**
      * Saldo de carteira total do fundo por mês (para a linha do fundo no gráfico).
      * Retorna Object[]{ano (Integer), mes (Integer), vlSdoCptlNmldSum (BigDecimal)}.
      */
+    @Transactional(Transactional.TxType.REQUIRED)
     @SuppressWarnings("unchecked")
     public List<Object[]> buscarCarteiraFundoSerie(int cdAgtFnco, int cdFundo) {
         LOG.debugf("[PAINEL] buscarCarteiraFundoSerie agente=%d fundo=%d", cdAgtFnco, cdFundo);
@@ -421,44 +366,10 @@ public class PainelRepository {
             + "GROUP BY YEAR(A.DT_FRMZ_OPR), MONTH(A.DT_FRMZ_OPR) "
             + "ORDER BY YEAR(A.DT_FRMZ_OPR) ASC, MONTH(A.DT_FRMZ_OPR) ASC";
 
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, cdAgtFnco);
-            ps.setInt(2, cdFundo);
-            ps.setInt(3, cdFundo);
-            try (ResultSet rs = ps.executeQuery()) {
-                return toListOfArrays(rs);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao buscar carteira fundo série", e);
-        }
-    }
-
-    // =========================================================================
-    // HELPERS PRIVADOS
-    // =========================================================================
-
-    private List<Object[]> toListOfArrays(ResultSet rs) throws SQLException {
-        ResultSetMetaData meta = rs.getMetaData();
-        int cols = meta.getColumnCount();
-        List<Object[]> result = new ArrayList<>();
-        while (rs.next()) {
-            Object[] row = new Object[cols];
-            for (int i = 1; i <= cols; i++) {
-                row[i - 1] = rs.getObject(i);
-            }
-            result.add(row);
-        }
-        return result;
-    }
-
-    private Object[] toArray(ResultSet rs) throws SQLException {
-        ResultSetMetaData meta = rs.getMetaData();
-        int cols = meta.getColumnCount();
-        Object[] row = new Object[cols];
-        for (int i = 1; i <= cols; i++) {
-            row[i - 1] = rs.getObject(i);
-        }
-        return row;
+        return em.createNativeQuery(sql)
+                .setParameter(1, cdAgtFnco)
+                .setParameter(2, cdFundo)
+                .setParameter(3, cdFundo)
+                .getResultList();
     }
 }

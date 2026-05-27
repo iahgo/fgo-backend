@@ -1,16 +1,11 @@
 package com.example.repository;
 
-import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
+import jakarta.transaction.Transactional;
 import org.jboss.logging.Logger;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -24,7 +19,7 @@ public class MovimentacaoRepository {
     private static final Logger LOG = Logger.getLogger(MovimentacaoRepository.class);
 
     @Inject
-    AgroalDataSource dataSource;
+    EntityManager em;
 
     // ─────────────────────────────────────────────────────────────────────────
     // DETALHE DE UMA REMESSA — DET_MVT_FNCR
@@ -35,6 +30,8 @@ public class MovimentacaoRepository {
      *
      * Retorna Object[]{nmTipMvtcFncr, vlNmmlMvtcFncr, vlAtlMntrMvtc, vlLqdoMvtd}.
      */
+    @Transactional(Transactional.TxType.REQUIRED)
+    @SuppressWarnings("unchecked")
     public List<Object[]> buscarDetalhe(int cdAgtFnco, int cdRmsAgtFnco) {
         LOG.debugf("[MOVIM-DET] agente=%d remessa=%d", cdAgtFnco, cdRmsAgtFnco);
 
@@ -53,16 +50,10 @@ public class MovimentacaoRepository {
             + "  AND A.CD_RMS_AGT_FNCO = ? "
             + "ORDER BY C.NM_TIP_MVTC_FNCR";
 
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, cdAgtFnco);
-            ps.setInt(2, cdRmsAgtFnco);
-            try (ResultSet rs = ps.executeQuery()) {
-                return toListOfArrays(rs);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao buscar detalhe de movimentação", e);
-        }
+        return em.createNativeQuery(sql)
+                .setParameter(1, cdAgtFnco)
+                .setParameter(2, cdRmsAgtFnco)
+                .getResultList();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -84,27 +75,28 @@ public class MovimentacaoRepository {
      *   [8]  A.QT_REG_RMS            qtdeRegistrosRemessa
      *   [9]  A.VL_LQDO_MVTC_RMS      valorLiqMovimentado
      */
+    @Transactional(Transactional.TxType.REQUIRED)
+    @SuppressWarnings("unchecked")
     public List<Object[]> listar(int cdAgtFnco, int cdFundo, int cdTipEstRms,
                                  Short nrSequencial, int page, int size) {
         LOG.debugf("[MOVIM-LIST] agente=%d fundo=%d est=%d seq=%s page=%d size=%d",
                 cdAgtFnco, cdFundo, cdTipEstRms, nrSequencial, page, size);
 
-        String sql = buildListSql() + " LIMIT ? OFFSET ?";
-
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            setCommonParams(ps, cdAgtFnco, cdFundo, cdTipEstRms, nrSequencial);
-            ps.setInt(8, size);
-            ps.setInt(9, page * size);
-            try (ResultSet rs = ps.executeQuery()) {
-                return toListOfArrays(rs);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao listar movimentações", e);
-        }
+        return em.createNativeQuery(buildListSql())
+                .setParameter(1, cdAgtFnco)
+                .setParameter(2, cdFundo)
+                .setParameter(3, cdFundo)
+                .setParameter(4, cdTipEstRms)
+                .setParameter(5, cdTipEstRms)
+                .setParameter(6, nrSequencial)
+                .setParameter(7, nrSequencial)
+                .setFirstResult(page * size)
+                .setMaxResults(size)
+                .getResultList();
     }
 
     /** Conta movimentações para paginação. */
+    @Transactional(Transactional.TxType.REQUIRED)
     public long contar(int cdAgtFnco, int cdFundo, int cdTipEstRms, Short nrSequencial) {
         String sql = "SELECT COUNT(*) "
             + "FROM DB2GFG.RMS_AGT_FNCO A "
@@ -115,34 +107,34 @@ public class MovimentacaoRepository {
             + "INNER JOIN DB2GFG.TIP_EST_RMS G ON A.CD_TIP_EST_RMS = G.CD_TIP_EST_RMS "
             + whereClause();
 
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            setCommonParams(ps, cdAgtFnco, cdFundo, cdTipEstRms, nrSequencial);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getLong(1);
-                }
-                return 0L;
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao contar movimentações", e);
-        }
+        Object result = em.createNativeQuery(sql)
+                .setParameter(1, cdAgtFnco)
+                .setParameter(2, cdFundo)
+                .setParameter(3, cdFundo)
+                .setParameter(4, cdTipEstRms)
+                .setParameter(5, cdTipEstRms)
+                .setParameter(6, nrSequencial)
+                .setParameter(7, nrSequencial)
+                .getSingleResult();
+        return result == null ? 0L : ((Number) result).longValue();
     }
 
     /** Lista todas as movimentações (sem paginação) para export CSV. */
+    @Transactional(Transactional.TxType.REQUIRED)
+    @SuppressWarnings("unchecked")
     public List<Object[]> listarTodos(int cdAgtFnco, int cdFundo, int cdTipEstRms, Short nrSequencial) {
         LOG.debugf("[MOVIM-LIST] exportar agente=%d fundo=%d est=%d seq=%s",
                 cdAgtFnco, cdFundo, cdTipEstRms, nrSequencial);
 
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(buildListSql())) {
-            setCommonParams(ps, cdAgtFnco, cdFundo, cdTipEstRms, nrSequencial);
-            try (ResultSet rs = ps.executeQuery()) {
-                return toListOfArrays(rs);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao exportar movimentações", e);
-        }
+        return em.createNativeQuery(buildListSql())
+                .setParameter(1, cdAgtFnco)
+                .setParameter(2, cdFundo)
+                .setParameter(3, cdFundo)
+                .setParameter(4, cdTipEstRms)
+                .setParameter(5, cdTipEstRms)
+                .setParameter(6, nrSequencial)
+                .setParameter(7, nrSequencial)
+                .getResultList();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -187,30 +179,5 @@ public class MovimentacaoRepository {
             + "  AND (? = -1 OR A.CD_FNDO_GRTR = ?) "
             + "  AND (? = -1 OR A.CD_TIP_EST_RMS = ?) "
             + "  AND (? IS NULL OR A.NR_SEQL_RMS = ?) ";
-    }
-
-    private void setCommonParams(PreparedStatement ps, int cdAgtFnco, int cdFundo,
-                                 int cdTipEstRms, Short nrSequencial) throws SQLException {
-        ps.setInt(1, cdAgtFnco);
-        ps.setInt(2, cdFundo);
-        ps.setInt(3, cdFundo);
-        ps.setInt(4, cdTipEstRms);
-        ps.setInt(5, cdTipEstRms);
-        ps.setObject(6, nrSequencial);
-        ps.setObject(7, nrSequencial);
-    }
-
-    private List<Object[]> toListOfArrays(ResultSet rs) throws SQLException {
-        ResultSetMetaData meta = rs.getMetaData();
-        int cols = meta.getColumnCount();
-        List<Object[]> result = new ArrayList<>();
-        while (rs.next()) {
-            Object[] row = new Object[cols];
-            for (int i = 1; i <= cols; i++) {
-                row[i - 1] = rs.getObject(i);
-            }
-            result.add(row);
-        }
-        return result;
     }
 }

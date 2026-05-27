@@ -37,15 +37,10 @@
             <artifactId>quarkus-resteasy-reactive-jackson</artifactId>
         </dependency>
 
-        <!--
-            Agroal — pool de conexões JDBC (DataSource).
-            Expõe AgroalDataSource para injeção nos repositórios.
-            quarkus-jdbc-db2 já traz agroal transitivamente em runtime,
-            mas a dependência explícita garante o compile scope.
-        -->
+        <!-- Hibernate ORM — mantido para uso de EntityManager nas queries nativas -->
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-agroal</artifactId>
+            <artifactId>quarkus-hibernate-orm</artifactId>
         </dependency>
 
         <!--

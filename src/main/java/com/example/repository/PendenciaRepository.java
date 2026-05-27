@@ -1,16 +1,11 @@
 package com.example.repository;
 
-import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
+import jakarta.transaction.Transactional;
 import org.jboss.logging.Logger;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -24,7 +19,7 @@ public class PendenciaRepository {
     private static final Logger LOG = Logger.getLogger(PendenciaRepository.class);
 
     @Inject
-    AgroalDataSource dataSource;
+    EntityManager em;
 
     /**
      * Lista pendências paginadas com filtros opcionais.
@@ -37,27 +32,26 @@ public class PendenciaRepository {
      *   [4]  A.NM_TIP_PNC_OPR_CRD     tipoPendencia
      *   [5]  A.DT_SNC_PHC             dataInicioPendencia
      */
+    @Transactional(Transactional.TxType.REQUIRED)
+    @SuppressWarnings("unchecked")
     public List<Object[]> listar(int cdAgtFnco, int cdFundo, int cdPrograma,
                                  String tipoPendencia, int page, int size) {
         LOG.debugf("[PENDENCIA] agente=%d fundo=%d prog=%d tipo=%s page=%d size=%d",
                 cdAgtFnco, cdFundo, cdPrograma, tipoPendencia, page, size);
 
-        String sql = buildSql(tipoPendencia) + " LIMIT ? OFFSET ?";
-
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            setCommonParams(ps, cdAgtFnco, cdFundo, cdPrograma);
-            ps.setInt(6, size);
-            ps.setInt(7, page * size);
-            try (ResultSet rs = ps.executeQuery()) {
-                return toListOfArrays(rs);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao listar pendências", e);
-        }
+        return em.createNativeQuery(buildSql(tipoPendencia))
+                .setParameter(1, cdAgtFnco)
+                .setParameter(2, cdFundo)
+                .setParameter(3, cdFundo)
+                .setParameter(4, cdPrograma)
+                .setParameter(5, cdPrograma)
+                .setFirstResult(page * size)
+                .setMaxResults(size)
+                .getResultList();
     }
 
     /** Conta total de pendências para paginação. */
+    @Transactional(Transactional.TxType.REQUIRED)
     public long contar(int cdAgtFnco, int cdFundo, int cdPrograma, String tipoPendencia) {
         String sql = "SELECT COUNT(*) "
             + "FROM DB2D4W.DETT_OPR_PND A "
@@ -68,34 +62,30 @@ public class PendenciaRepository {
             + "LEFT JOIN DB2GFG.AGT_FNCO E ON D.CD_AGT_FNCO = E.CD_AGT_FNCO "
             + whereClause(tipoPendencia);
 
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            setCommonParams(ps, cdAgtFnco, cdFundo, cdPrograma);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getLong(1);
-                }
-                return 0L;
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao contar pendências", e);
-        }
+        Object result = em.createNativeQuery(sql)
+                .setParameter(1, cdAgtFnco)
+                .setParameter(2, cdFundo)
+                .setParameter(3, cdFundo)
+                .setParameter(4, cdPrograma)
+                .setParameter(5, cdPrograma)
+                .getSingleResult();
+        return result == null ? 0L : ((Number) result).longValue();
     }
 
     /** Lista TODAS as pendências (sem paginação) para exportação CSV. */
+    @Transactional(Transactional.TxType.REQUIRED)
+    @SuppressWarnings("unchecked")
     public List<Object[]> listarTodos(int cdAgtFnco, int cdFundo, int cdPrograma, String tipoPendencia) {
         LOG.debugf("[PENDENCIA] exportar agente=%d fundo=%d prog=%d tipo=%s",
                 cdAgtFnco, cdFundo, cdPrograma, tipoPendencia);
 
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(buildSql(tipoPendencia))) {
-            setCommonParams(ps, cdAgtFnco, cdFundo, cdPrograma);
-            try (ResultSet rs = ps.executeQuery()) {
-                return toListOfArrays(rs);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao exportar pendências", e);
-        }
+        return em.createNativeQuery(buildSql(tipoPendencia))
+                .setParameter(1, cdAgtFnco)
+                .setParameter(2, cdFundo)
+                .setParameter(3, cdFundo)
+                .setParameter(4, cdPrograma)
+                .setParameter(5, cdPrograma)
+                .getResultList();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -139,28 +129,5 @@ public class PendenciaRepository {
             base += "  AND A.NM_TIP_PNC_OPR_CRD = '" + tipoPendencia.replace("'", "''") + "' ";
         }
         return base;
-    }
-
-    private void setCommonParams(PreparedStatement ps, int cdAgtFnco, int cdFundo,
-                                 int cdPrograma) throws SQLException {
-        ps.setInt(1, cdAgtFnco);
-        ps.setInt(2, cdFundo);
-        ps.setInt(3, cdFundo);
-        ps.setInt(4, cdPrograma);
-        ps.setInt(5, cdPrograma);
-    }
-
-    private List<Object[]> toListOfArrays(ResultSet rs) throws SQLException {
-        ResultSetMetaData meta = rs.getMetaData();
-        int cols = meta.getColumnCount();
-        List<Object[]> result = new ArrayList<>();
-        while (rs.next()) {
-            Object[] row = new Object[cols];
-            for (int i = 1; i <= cols; i++) {
-                row[i - 1] = rs.getObject(i);
-            }
-            result.add(row);
-        }
-        return result;
     }
 }
