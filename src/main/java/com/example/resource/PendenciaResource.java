@@ -3,6 +3,8 @@ package com.example.resource;
 import com.example.dto.FiltroItemDto;
 import com.example.dto.PageDto;
 import com.example.dto.listagem.PendenciaItemDto;
+import com.example.security.ContextoSeguranca;
+import com.example.security.Funcionalidade;
 import com.example.service.PendenciaService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.DefaultValue;
@@ -31,14 +33,7 @@ import java.util.List;
  * GET /api/v1/pendencias               — endpoint 21: listagem paginada
  * GET /api/v1/pendencias/exportar      — endpoint 22: exportação CSV
  *
- * Parâmetros:
- *   cdFundo        — código do fundo (-1 = todos)
- *   cdPrograma     — código do programa (-1 = todos)
- *   tipoPendencia  — tipo de pendência (null = todas)
- *   page           — página (0-based)
- *   size           — 10, 50 ou 100 (padrão 100)
- *
- * TODO: substituir @QueryParam("cdAgtFnco") por contexto JWT quando a autenticação for implementada.
+ * O cdAgtFnco é extraído do contexto JWT (ContextoSeguranca) — não é passado como parâmetro.
  */
 @Path("/api/v1/pendencias")
 @Produces(MediaType.APPLICATION_JSON)
@@ -49,6 +44,9 @@ public class PendenciaResource {
 
     @Inject
     PendenciaService pendenciaService;
+
+    @Inject
+    ContextoSeguranca contexto;
 
     // =========================================================================
     // Filtros de tipo de pendência — endpoint 20
@@ -67,17 +65,17 @@ public class PendenciaResource {
     // =========================================================================
 
     @GET
+    @Funcionalidade("PENDENCIAS_LISTA")
     @Operation(summary = "Lista pendências paginadas",
             description = "Retorna pendências da tabela DB2D4W.DETT_OPR_PND. Campo NM_TIP_PNC_OPR_CRD identifica o tipo (texto). Filtro tipoPendencia filtra por texto exato desse campo. Data via DT_SNC_PHC.")
     public PageDto<PendenciaItemDto> listar(
-            // TODO: substituir por JWT context
-            @QueryParam("cdAgtFnco")    int cdAgtFnco,
             @QueryParam("cdFundo")      @DefaultValue("-1")  int cdFundo,
             @QueryParam("cdPrograma")   @DefaultValue("-1")  int cdPrograma,
             @QueryParam("tipoPendencia")                     String tipoPendencia,
             @QueryParam("page")         @DefaultValue("0")   int page,
             @QueryParam("size")         @DefaultValue("100") int size) {
 
+        int cdAgtFnco = contexto.getCdAgtFnco();
         int sizeValido = validarSize(size);
         int pageValido = Math.max(page, 0);
         LOG.debugf("[PEND-RES] listar agente=%d fundo=%d prog=%d tipo=%s page=%d size=%d",
@@ -92,15 +90,15 @@ public class PendenciaResource {
     @GET
     @Path("/exportar")
     @Produces("text/csv")
+    @Funcionalidade("PENDENCIAS_LISTA")
     @Operation(summary = "Exporta pendências em CSV",
             description = "Retorna todas as pendências (sem paginação) em formato CSV para download.")
     public Response exportar(
-            // TODO: substituir por JWT context
-            @QueryParam("cdAgtFnco")    int cdAgtFnco,
             @QueryParam("cdFundo")      @DefaultValue("-1") int cdFundo,
             @QueryParam("cdPrograma")   @DefaultValue("-1") int cdPrograma,
             @QueryParam("tipoPendencia")                    String tipoPendencia) {
 
+        int cdAgtFnco = contexto.getCdAgtFnco();
         LOG.debugf("[PEND-RES] exportar agente=%d fundo=%d prog=%d tipo=%s",
                 cdAgtFnco, cdFundo, cdPrograma, tipoPendencia);
 
@@ -113,9 +111,9 @@ public class PendenciaResource {
 
             for (PendenciaItemDto item : items) {
                 writer.write(csvLine(
-                        item.nmFundo(),
-                        item.nmPrograma(),
-                        item.nrContrato(),
+                        item.nomeFundo(),
+                        item.nomePrograma(),
+                        item.numeroContrato(),
                         item.situacaoContrato(),
                         item.tipoPendencia(),
                         formatDate(item.dataInicioPendencia())

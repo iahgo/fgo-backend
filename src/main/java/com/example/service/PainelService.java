@@ -136,25 +136,25 @@ public class PainelService {
         for (Object[] row : rows) {
             // [0]=cdTipPgmCrd, [1]=nmTipPgmCrd(CASE), [2]=coberturaMedia,
             // [3]=vlHonrados,  [4]=vlRecuperados,       [5]=vlContratado
-            String cdPrograma       = String.valueOf(toInt(row[0]));
-            String nmPrograma       = trimNull(row[1]);
-            BigDecimal cobertura    = toBigDecimal(row[2]);
-            BigDecimal vlHonrados   = toBigDecimal(row[3]);
-            BigDecimal vlRecuperados = toBigDecimal(row[4]);
-            BigDecimal vlContratado = toBigDecimal(row[5]);
-            // IVH = vlHonrados / vlContratado * 100
+            String codigoPrograma    = String.valueOf(toInt(row[0]));
+            String nomePrograma      = trimNull(row[1]);
+            BigDecimal cobertura     = toBigDecimal(row[2]);
+            BigDecimal valorHonrado  = toBigDecimal(row[3]);
+            BigDecimal valorRecuperado = toBigDecimal(row[4]);
+            BigDecimal valorContratado = toBigDecimal(row[5]);
+            // IVH = valorHonrado / valorContratado * 100
             BigDecimal ivh = BigDecimal.ZERO;
-            if (vlContratado != null && vlContratado.compareTo(BigDecimal.ZERO) > 0
-                    && vlHonrados != null) {
-                ivh = vlHonrados.divide(vlContratado, 6, RoundingMode.HALF_UP)
+            if (valorContratado != null && valorContratado.compareTo(BigDecimal.ZERO) > 0
+                    && valorHonrado != null) {
+                ivh = valorHonrado.divide(valorContratado, 6, RoundingMode.HALF_UP)
                         .multiply(new BigDecimal("100")).setScale(4, RoundingMode.HALF_UP);
             }
             result.add(new IvhItemDto(
-                    cdPrograma, nmPrograma,
+                    codigoPrograma, nomePrograma,
                     cobertura != null ? cobertura : BigDecimal.ZERO,
-                    vlHonrados != null ? vlHonrados : BigDecimal.ZERO,
-                    vlRecuperados != null ? vlRecuperados : BigDecimal.ZERO,
-                    vlContratado != null ? vlContratado : BigDecimal.ZERO,
+                    valorHonrado != null ? valorHonrado : BigDecimal.ZERO,
+                    valorRecuperado != null ? valorRecuperado : BigDecimal.ZERO,
+                    valorContratado != null ? valorContratado : BigDecimal.ZERO,
                     ivh
             ));
         }

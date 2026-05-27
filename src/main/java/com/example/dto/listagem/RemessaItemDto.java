@@ -2,19 +2,16 @@ package com.example.dto.listagem;
 
 import java.time.LocalDateTime;
 
-/**
- * DTO de item da listagem paginada de remessas.
- */
 public record RemessaItemDto(
         String referencia,
         LocalDateTime dataHoraRecebimento,
-        int nrSequencial,
+        int numeroSequencial,
         String agenteFinanceiro,
-        String nmFundo,
+        String nomeFundo,
         String situacao,
         String motivoRejeicao,
-        Integer qtdeRegistros,
-        Integer registrosAceitos,
-        Integer registrosRecusados
+        Integer quantidadeRegistros,
+        Integer quantidadeAceitos,
+        Integer quantidadeRecusados
 ) {
 }

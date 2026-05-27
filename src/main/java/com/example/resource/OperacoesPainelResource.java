@@ -2,6 +2,8 @@ package com.example.resource;
 
 import com.example.dto.PageDto;
 import com.example.dto.listagem.OperacaoItemDto;
+import com.example.security.ContextoSeguranca;
+import com.example.security.Funcionalidade;
 import com.example.service.OperacaoListagemService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.DefaultValue;
@@ -30,14 +32,7 @@ import java.util.List;
  * GET /api/v1/operacoes          — endpoint 10: listagem paginada
  * GET /api/v1/operacoes/exportar — endpoint 11: exportação CSV
  *
- * Parâmetros de filtro:
- *   cdFundo     — código do fundo garantidor (int, -1 = todos)
- *   cdPrograma  — código do programa de crédito (int, -1 = todos)
- *   nrContrato  — número/parte do contrato (string, null = todos)
- *   page        — página (0-based, padrão 0)
- *   size        — tamanho da página: 10, 50 ou 100 (padrão 100)
- *
- * TODO: substituir @QueryParam("cdAgtFnco") por contexto JWT quando a autenticação for implementada.
+ * O cdAgtFnco é extraído do contexto JWT (ContextoSeguranca) — não é passado como parâmetro.
  */
 @Path("/api/v1/operacoes")
 @Produces(MediaType.APPLICATION_JSON)
@@ -49,22 +44,25 @@ public class OperacoesPainelResource {
     @Inject
     OperacaoListagemService operacaoListagemService;
 
+    @Inject
+    ContextoSeguranca contexto;
+
     // =========================================================================
     // Listagem paginada — endpoint 10
     // =========================================================================
 
     @GET
+    @Funcionalidade("OPERACOES_LISTA")
     @Operation(summary = "Lista operações paginadas",
             description = "Retorna operações de crédito do agente — DB2D4W.CTRA_FNDO_GRTR filtrado por DT_REF=MAX. Inclui Pronampe Solidário RS 1/RS 2. Filtros: fundo, programa, nrContrato (LIKE).")
     public PageDto<OperacaoItemDto> listar(
-            // TODO: substituir por JWT context
-            @QueryParam("cdAgtFnco")  int cdAgtFnco,
             @QueryParam("cdFundo")    @DefaultValue("-1")  int cdFundo,
             @QueryParam("cdPrograma") @DefaultValue("-1")  int cdPrograma,
             @QueryParam("nrContrato")                      String nrContrato,
             @QueryParam("page")       @DefaultValue("0")   int page,
             @QueryParam("size")       @DefaultValue("100") int size) {
 
+        int cdAgtFnco = contexto.getCdAgtFnco();
         int sizeValido = validarSize(size);
         int pageValido = Math.max(page, 0);
         LOG.debugf("[OPR-PAINEL] listar agente=%d fundo=%d prog=%d cont=%s page=%d size=%d",
@@ -79,15 +77,15 @@ public class OperacoesPainelResource {
     @GET
     @Path("/exportar")
     @Produces("text/csv")
+    @Funcionalidade("OPERACOES_LISTA")
     @Operation(summary = "Exporta operações em CSV",
             description = "Retorna todas as operações (sem paginação) em formato CSV para download.")
     public Response exportar(
-            // TODO: substituir por JWT context
-            @QueryParam("cdAgtFnco")  int cdAgtFnco,
             @QueryParam("cdFundo")    @DefaultValue("-1")  int cdFundo,
             @QueryParam("cdPrograma") @DefaultValue("-1")  int cdPrograma,
             @QueryParam("nrContrato")                      String nrContrato) {
 
+        int cdAgtFnco = contexto.getCdAgtFnco();
         LOG.debugf("[OPR-PAINEL] exportar agente=%d fundo=%d prog=%d cont=%s",
                 cdAgtFnco, cdFundo, cdPrograma, nrContrato);
 
@@ -101,12 +99,12 @@ public class OperacoesPainelResource {
 
             for (OperacaoItemDto item : items) {
                 writer.write(csvLine(
-                        item.nmFundo(),
-                        item.nmPrograma(),
-                        item.nrOperacao(),
+                        item.nomeFundo(),
+                        item.nomePrograma(),
+                        item.numeroOperacao(),
                         item.publicoAlvo(),
                         item.estadoOperacao(),
-                        formatDate(item.dataFormal()),
+                        formatDate(item.dataFormalizacao()),
                         formatDate(item.dataVencimento()),
                         formatBD(item.valorOperacao()),
                         formatBD(item.valorLiberado())

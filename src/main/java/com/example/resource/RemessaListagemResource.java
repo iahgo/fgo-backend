@@ -3,6 +3,8 @@ package com.example.resource;
 import com.example.dto.FiltroItemDto;
 import com.example.dto.PageDto;
 import com.example.dto.listagem.RemessaItemDto;
+import com.example.security.ContextoSeguranca;
+import com.example.security.Funcionalidade;
 import com.example.service.RemessaListagemService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.DefaultValue;
@@ -33,15 +35,7 @@ import java.util.List;
  * GET /api/v1/remessas                          — endpoint 14: listagem paginada
  * GET /api/v1/remessas/exportar                 — endpoint 15: exportação CSV
  *
- * Parâmetros:
- *   cdFundo         — código do fundo (-1 = todos)
- *   situacao        — cdTipEstRms (-1 = todas)
- *   motivoRejeicao  — cdMtvRjcRms (-1 = todos)
- *   nrSequencial    — número sequencial da remessa (null = todos)
- *   page            — página (0-based)
- *   size            — 10, 50 ou 100 (padrão 100)
- *
- * TODO: substituir @QueryParam("cdAgtFnco") por contexto JWT quando a autenticação for implementada.
+ * O cdAgtFnco é extraído do contexto JWT (ContextoSeguranca) — não é passado como parâmetro.
  */
 @Path("/api/v1/remessas")
 @Produces(MediaType.APPLICATION_JSON)
@@ -52,6 +46,9 @@ public class RemessaListagemResource {
 
     @Inject
     RemessaListagemService remessaListagemService;
+
+    @Inject
+    ContextoSeguranca contexto;
 
     // =========================================================================
     // Filtros de situação — endpoint 12
@@ -82,11 +79,10 @@ public class RemessaListagemResource {
     // =========================================================================
 
     @GET
+    @Funcionalidade("REMESSAS_LISTA")
     @Operation(summary = "Lista remessas paginadas",
             description = "Retorna remessas do agente com filtros opcionais, paginado.")
     public PageDto<RemessaItemDto> listar(
-            // TODO: substituir por JWT context
-            @QueryParam("cdAgtFnco")       int cdAgtFnco,
             @QueryParam("cdFundo")         @DefaultValue("-1")  int cdFundo,
             @QueryParam("situacao")        @DefaultValue("-1")  int situacao,
             @QueryParam("motivoRejeicao")  @DefaultValue("-1")  int motivoRejeicao,
@@ -94,6 +90,7 @@ public class RemessaListagemResource {
             @QueryParam("page")            @DefaultValue("0")   int page,
             @QueryParam("size")            @DefaultValue("100") int size) {
 
+        int cdAgtFnco = contexto.getCdAgtFnco();
         int sizeValido = validarSize(size);
         int pageValido = Math.max(page, 0);
         LOG.debugf("[REMESSA-RES] listar agente=%d fundo=%d sit=%d motivo=%d seq=%s page=%d size=%d",
@@ -109,16 +106,16 @@ public class RemessaListagemResource {
     @GET
     @Path("/exportar")
     @Produces("text/csv")
+    @Funcionalidade("REMESSAS_LISTA")
     @Operation(summary = "Exporta remessas em CSV",
             description = "Retorna todas as remessas (sem paginação) em formato CSV para download.")
     public Response exportar(
-            // TODO: substituir por JWT context
-            @QueryParam("cdAgtFnco")       int cdAgtFnco,
             @QueryParam("cdFundo")         @DefaultValue("-1")  int cdFundo,
             @QueryParam("situacao")        @DefaultValue("-1")  int situacao,
             @QueryParam("motivoRejeicao")  @DefaultValue("-1")  int motivoRejeicao,
             @QueryParam("nrSequencial")                         Short nrSequencial) {
 
+        int cdAgtFnco = contexto.getCdAgtFnco();
         LOG.debugf("[REMESSA-RES] exportar agente=%d fundo=%d sit=%d motivo=%d seq=%s",
                 cdAgtFnco, cdFundo, situacao, motivoRejeicao, nrSequencial);
 
@@ -134,14 +131,14 @@ public class RemessaListagemResource {
                 writer.write(csvLine(
                         item.referencia(),
                         formatDT(item.dataHoraRecebimento()),
-                        String.valueOf(item.nrSequencial()),
+                        String.valueOf(item.numeroSequencial()),
                         item.agenteFinanceiro(),
-                        item.nmFundo(),
+                        item.nomeFundo(),
                         item.situacao(),
                         item.motivoRejeicao(),
-                        formatInt(item.qtdeRegistros()),
-                        formatInt(item.registrosAceitos()),
-                        formatInt(item.registrosRecusados())
+                        formatInt(item.quantidadeRegistros()),
+                        formatInt(item.quantidadeAceitos()),
+                        formatInt(item.quantidadeRecusados())
                 ));
             }
             writer.flush();

@@ -116,6 +116,13 @@
             <artifactId>quarkus-arc</artifactId>
         </dependency>
 
+        <!-- H2 — banco em memória para desenvolvimento (substitui DB2 em dev) -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jdbc-h2</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- Testes -->
         <dependency>
             <groupId>io.quarkus</groupId>

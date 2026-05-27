@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
  * um ErroDto padronizado em vez de stack trace exposto ao cliente.
  *
  * Ordem de tratamento:
- *   1. Exceções de negócio FGO (AgenteNaoHabilitado, DadosNaoDisponiveis)
+ *   1. Exceções de negócio FGO (DadosNaoDisponiveis)
  *   2. Exceções de validação (Bean Validation — parâmetros inválidos)
  *   3. Exceções HTTP passadas explicitamente (WebApplicationException)
  *   4. Qualquer outra exceção → 500 Internal Server Error
@@ -30,14 +30,6 @@ public class GlobalExceptionMapper implements ExceptionMapper<Exception> {
 
     @Override
     public Response toResponse(Exception e) {
-
-        // --- Negócio: agente não habilitado ---
-        if (e instanceof AgenteNaoHabilitadoException ex) {
-            LOG.warnf("Acesso negado: agente=%d não habilitado.", ex.getCodAgente());
-            return Response.status(Response.Status.FORBIDDEN)
-                    .entity(new ErroDto("AGENTE_NAO_HABILITADO", ex.getMessage()))
-                    .build();
-        }
 
         // --- Negócio: dados indisponíveis no Redis ---
         if (e instanceof DadosNaoDisponiveisException ex) {

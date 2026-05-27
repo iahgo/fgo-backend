@@ -4,6 +4,8 @@ import com.example.dto.FiltroItemDto;
 import com.example.dto.PageDto;
 import com.example.dto.listagem.MovimentacaoDetalheDto;
 import com.example.dto.listagem.MovimentacaoItemDto;
+import com.example.security.ContextoSeguranca;
+import com.example.security.Funcionalidade;
 import com.example.service.MovimentacaoService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.DefaultValue;
@@ -35,14 +37,7 @@ import java.util.List;
  * GET /api/v1/movimentacoes/{nrSequencial}/detalhe    — endpoint 18: detalhe por ContaMovimentoGarantia
  * GET /api/v1/movimentacoes/exportar                  — endpoint 19: exportação CSV
  *
- * Parâmetros:
- *   cdFundo          — código do fundo (-1 = todos)
- *   situacaoRemessa  — cdTipEstRms (-1 = todas)
- *   nrSequencial     — número sequencial da remessa (null = todos)
- *   page             — página (0-based)
- *   size             — 10, 50 ou 100 (padrão 100)
- *
- * TODO: substituir @QueryParam("cdAgtFnco") por contexto JWT quando a autenticação for implementada.
+ * O cdAgtFnco é extraído do contexto JWT (ContextoSeguranca) — não é passado como parâmetro.
  */
 @Path("/api/v1/movimentacoes")
 @Produces(MediaType.APPLICATION_JSON)
@@ -53,6 +48,9 @@ public class MovimentacaoResource {
 
     @Inject
     MovimentacaoService movimentacaoService;
+
+    @Inject
+    ContextoSeguranca contexto;
 
     // =========================================================================
     // Filtros de situação de remessa — endpoint 16
@@ -71,17 +69,17 @@ public class MovimentacaoResource {
     // =========================================================================
 
     @GET
+    @Funcionalidade("MOVIMENTACOES_LISTA")
     @Operation(summary = "Lista movimentações paginadas",
             description = "Retorna movimentações financeiras do agente com filtros opcionais, paginado.")
     public PageDto<MovimentacaoItemDto> listar(
-            // TODO: substituir por JWT context
-            @QueryParam("cdAgtFnco")        int cdAgtFnco,
             @QueryParam("cdFundo")          @DefaultValue("-1")  int cdFundo,
             @QueryParam("situacaoRemessa")  @DefaultValue("-1")  int situacaoRemessa,
             @QueryParam("nrSequencial")                          Short nrSequencial,
             @QueryParam("page")             @DefaultValue("0")   int page,
             @QueryParam("size")             @DefaultValue("100") int size) {
 
+        int cdAgtFnco = contexto.getCdAgtFnco();
         int sizeValido = validarSize(size);
         int pageValido = Math.max(page, 0);
         LOG.debugf("[MOVIM-RES] listar agente=%d fundo=%d sitRms=%d seq=%s page=%d size=%d",
@@ -95,13 +93,13 @@ public class MovimentacaoResource {
 
     @GET
     @Path("/{nrSequencial}/detalhe")
+    @Funcionalidade("MOVIMENTACOES_DETALHE")
     @Operation(summary = "Detalhe de movimentação financeira",
             description = "Retorna o breakdown por tipo (DB2GFG.RSM_MVTC_FNCR_RMS) de uma remessa. "
                     + "Path param: NR_SEQL_RMS (número sequencial da remessa). Fonte: query DET_MVT_FNCR do BI.")
     public List<MovimentacaoDetalheDto> detalhe(
-            // TODO: substituir por JWT context
-            @QueryParam("cdAgtFnco") int cdAgtFnco,
             @PathParam("nrSequencial") short nrSequencial) {
+        int cdAgtFnco = contexto.getCdAgtFnco();
         LOG.debugf("[MOVIM-RES] detalhe agente=%d nrSeql=%d", cdAgtFnco, nrSequencial);
         return movimentacaoService.buscarDetalhe(cdAgtFnco, nrSequencial);
     }
@@ -113,15 +111,15 @@ public class MovimentacaoResource {
     @GET
     @Path("/exportar")
     @Produces("text/csv")
+    @Funcionalidade("MOVIMENTACOES_LISTA")
     @Operation(summary = "Exporta movimentações em CSV",
             description = "Retorna todas as movimentações (sem paginação) em formato CSV para download.")
     public Response exportar(
-            // TODO: substituir por JWT context
-            @QueryParam("cdAgtFnco")        int cdAgtFnco,
             @QueryParam("cdFundo")          @DefaultValue("-1") int cdFundo,
             @QueryParam("situacaoRemessa")  @DefaultValue("-1") int situacaoRemessa,
             @QueryParam("nrSequencial")                         Short nrSequencial) {
 
+        int cdAgtFnco = contexto.getCdAgtFnco();
         LOG.debugf("[MOVIM-RES] exportar agente=%d fundo=%d sitRms=%d seq=%s",
                 cdAgtFnco, cdFundo, situacaoRemessa, nrSequencial);
 
@@ -136,16 +134,16 @@ public class MovimentacaoResource {
 
             for (MovimentacaoItemDto item : items) {
                 writer.write(csvLine(
-                        item.nmFundo(),
-                        String.valueOf(item.nrSequencialRemessa()),
-                        item.tipoMovFinanceira(),
+                        item.nomeFundo(),
+                        String.valueOf(item.numeroSequencialRemessa()),
+                        item.tipoMovimentacaoFinanceira(),
                         item.situacaoMovFinanceira(),
                         item.situacaoRemessa(),
-                        formatDate(item.dataProcRemessa()),
-                        formatDate(item.dataAtualMonetaria()),
-                        formatDate(item.dataMovFinanceira()),
-                        formatInt(item.qtdeRegistrosRemessa()),
-                        formatBD(item.valorLiqMovimentado())
+                        formatDate(item.dataProcessamento()),
+                        formatDate(item.dataAtualizacaoMonetaria()),
+                        formatDate(item.dataMovimentacaoFinanceira()),
+                        formatInt(item.quantidadeRegistros()),
+                        formatBD(item.valorLiquidoMovimentado())
                 ));
             }
             writer.flush();

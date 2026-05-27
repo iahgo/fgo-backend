@@ -2,74 +2,48 @@ package com.example.dto;
 
 import java.math.BigDecimal;
 
-/**
- * DTO de KPI por programa de crédito — exposto na API REST.
- *
- * Separado do domain (OperacaoAgregada) porque:
- *   - Pode evoluir de forma independente (adicionar/remover campos sem afetar o domínio)
- *   - Contém campos calculados (taxaInad) que não vêm do DB2
- *   - É serializado para JSON no Redis e retornado na API
- *
- * Precisa de construtor padrão (Jackson) e getters/setters (deserialização do Redis).
- */
 public class OperacaoKpiDto {
 
-    /** Nome do programa de crédito (ex: "PRONAMPE", "FGI", "PEAC"). */
-    private String programa;
-
-    /** Quantidade de operações ativas no período. */
-    private long totalAtivas;
-
-    /** Valor total da carteira garantida em reais. */
-    private BigDecimal vlrCarteira;
-
-    /** Quantidade de operações com status inadimplente. */
-    private long totalInad;
-
-    /**
-     * Taxa de inadimplência: totalInad / totalAtivas.
-     * Calculada pelo mapper — não vem do DB2.
-     * Exemplo: 0.0055 representa 0,55%.
-     */
-    private double taxaInad;
-
-    /** Soma do saldo em atraso (VL_SDO_CPTL_ATR). */
-    private BigDecimal vlrAtraso;
-
-    /** Soma da garantia ajustada (VL_GRT_OPR_AJSD). */
-    private BigDecimal vlrGarantia;
+    private String nomePrograma;
+    private long quantidadeAtivas;
+    private BigDecimal saldoCarteira;
+    private long quantidadeInadimplentes;
+    private double taxaInadimplencia;
+    private BigDecimal saldoAtraso;
+    private BigDecimal valorGarantia;
 
     public OperacaoKpiDto() {}
 
-    public OperacaoKpiDto(String programa, long totalAtivas, BigDecimal vlrCarteira,
-                          long totalInad, double taxaInad, BigDecimal vlrAtraso, BigDecimal vlrGarantia) {
-        this.programa    = programa;
-        this.totalAtivas = totalAtivas;
-        this.vlrCarteira = vlrCarteira;
-        this.totalInad   = totalInad;
-        this.taxaInad    = taxaInad;
-        this.vlrAtraso   = vlrAtraso;
-        this.vlrGarantia = vlrGarantia;
+    public OperacaoKpiDto(String nomePrograma, long quantidadeAtivas, BigDecimal saldoCarteira,
+                          long quantidadeInadimplentes, double taxaInadimplencia,
+                          BigDecimal saldoAtraso, BigDecimal valorGarantia) {
+        this.nomePrograma           = nomePrograma;
+        this.quantidadeAtivas       = quantidadeAtivas;
+        this.saldoCarteira          = saldoCarteira;
+        this.quantidadeInadimplentes = quantidadeInadimplentes;
+        this.taxaInadimplencia      = taxaInadimplencia;
+        this.saldoAtraso            = saldoAtraso;
+        this.valorGarantia          = valorGarantia;
     }
 
-    public String getPrograma()        { return programa; }
-    public void setPrograma(String v)  { this.programa = v; }
+    public String getNomePrograma()                  { return nomePrograma; }
+    public void setNomePrograma(String v)            { this.nomePrograma = v; }
 
-    public long getTotalAtivas()       { return totalAtivas; }
-    public void setTotalAtivas(long v) { this.totalAtivas = v; }
+    public long getQuantidadeAtivas()                { return quantidadeAtivas; }
+    public void setQuantidadeAtivas(long v)          { this.quantidadeAtivas = v; }
 
-    public BigDecimal getVlrCarteira()        { return vlrCarteira; }
-    public void setVlrCarteira(BigDecimal v)  { this.vlrCarteira = v; }
+    public BigDecimal getSaldoCarteira()             { return saldoCarteira; }
+    public void setSaldoCarteira(BigDecimal v)       { this.saldoCarteira = v; }
 
-    public long getTotalInad()         { return totalInad; }
-    public void setTotalInad(long v)   { this.totalInad = v; }
+    public long getQuantidadeInadimplentes()         { return quantidadeInadimplentes; }
+    public void setQuantidadeInadimplentes(long v)  { this.quantidadeInadimplentes = v; }
 
-    public double getTaxaInad()        { return taxaInad; }
-    public void setTaxaInad(double v)  { this.taxaInad = v; }
+    public double getTaxaInadimplencia()             { return taxaInadimplencia; }
+    public void setTaxaInadimplencia(double v)       { this.taxaInadimplencia = v; }
 
-    public BigDecimal getVlrAtraso()          { return vlrAtraso; }
-    public void setVlrAtraso(BigDecimal v)    { this.vlrAtraso = v; }
+    public BigDecimal getSaldoAtraso()               { return saldoAtraso; }
+    public void setSaldoAtraso(BigDecimal v)         { this.saldoAtraso = v; }
 
-    public BigDecimal getVlrGarantia()        { return vlrGarantia; }
-    public void setVlrGarantia(BigDecimal v)  { this.vlrGarantia = v; }
+    public BigDecimal getValorGarantia()             { return valorGarantia; }
+    public void setValorGarantia(BigDecimal v)       { this.valorGarantia = v; }
 }

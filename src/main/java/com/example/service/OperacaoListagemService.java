@@ -15,7 +15,7 @@ import java.util.List;
 /**
  * Serviço para listagem paginada de operações de crédito.
  *
- * TODO: substituir cdAgtFnco por contexto JWT quando a autenticação for implementada.
+ * O cdAgtFnco é fornecido pelo contexto JWT (ContextoSeguranca) no resource.
  */
 @ApplicationScoped
 public class OperacaoListagemService {
@@ -28,7 +28,7 @@ public class OperacaoListagemService {
     /**
      * Lista operações paginadas com filtros opcionais.
      *
-     * @param cdAgtFnco  código do agente financeiro (obrigatório)
+     * @param cdAgtFnco  código do agente financeiro (do JWT)
      * @param cdFundo    código do fundo (-1 = todos)
      * @param cdPrograma código do programa (-1 = todos)
      * @param nrContrato número/parte do contrato (null = todos)

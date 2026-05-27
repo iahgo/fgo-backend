@@ -7,6 +7,8 @@ import com.example.dto.painel.IvhSerieDto;
 import com.example.dto.painel.MovimentacaoSerieDto;
 import com.example.dto.painel.PendenciasResumoDto;
 import com.example.dto.painel.RemessasResumoDto;
+import com.example.security.ContextoSeguranca;
+import com.example.security.Funcionalidade;
 import com.example.service.PainelService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.DefaultValue;
@@ -33,7 +35,7 @@ import java.util.List;
  *   GET /api/v1/painel/pendencias/resumo
  *   GET /api/v1/painel/movimentacao-financeira/serie-historica
  *
- * TODO: substituir @QueryParam("cdAgtFnco") por contexto JWT quando a autenticação for implementada.
+ * O cdAgtFnco é extraído do contexto JWT (ContextoSeguranca) — não é passado como parâmetro.
  */
 @Path("/api/v1/painel")
 @Produces(MediaType.APPLICATION_JSON)
@@ -45,19 +47,22 @@ public class PainelResource {
     @Inject
     PainelService painelService;
 
+    @Inject
+    ContextoSeguranca contexto;
+
     // =========================================================================
     // Informações Gerais — endpoint 3
     // =========================================================================
 
     @GET
     @Path("/informacoes-gerais")
+    @Funcionalidade("PAINEL_INFO_GERAIS")
     @Operation(summary = "KPIs de informações gerais",
             description = "Retorna mutuários, operações, saldo contratado, ticket médio e saldo carteira.")
     public InformacoesGeraisDto informacoesGerais(
-            // TODO: substituir por JWT context
-            @QueryParam("cdAgtFnco") int cdAgtFnco,
             @QueryParam("cdFundo")   @DefaultValue("-1") int cdFundo,
             @QueryParam("cdPrograma") @DefaultValue("-1") int cdPrograma) {
+        int cdAgtFnco = contexto.getCdAgtFnco();
         LOG.debugf("[PAINEL-RES] informacoesGerais agente=%d fundo=%d prog=%d", cdAgtFnco, cdFundo, cdPrograma);
         return painelService.buscarInformacoesGerais(cdAgtFnco, cdFundo, cdPrograma);
     }
@@ -68,13 +73,13 @@ public class PainelResource {
 
     @GET
     @Path("/inadimplencia")
+    @Funcionalidade("PAINEL_INADIMPLENCIA")
     @Operation(summary = "Dados de inadimplência",
             description = "Retorna saldo atrasado, índice de inadimplência por saldo e por operações.")
     public InadimplenciaDto inadimplencia(
-            // TODO: substituir por JWT context
-            @QueryParam("cdAgtFnco") int cdAgtFnco,
             @QueryParam("cdFundo")   @DefaultValue("-1") int cdFundo,
             @QueryParam("cdPrograma") @DefaultValue("-1") int cdPrograma) {
+        int cdAgtFnco = contexto.getCdAgtFnco();
         LOG.debugf("[PAINEL-RES] inadimplencia agente=%d fundo=%d prog=%d", cdAgtFnco, cdFundo, cdPrograma);
         return painelService.buscarInadimplencia(cdAgtFnco, cdFundo, cdPrograma);
     }
@@ -85,12 +90,12 @@ public class PainelResource {
 
     @GET
     @Path("/ivh")
+    @Funcionalidade("PAINEL_IVH")
     @Operation(summary = "Tabela IVH por programa",
             description = "Retorna cobertura, valores honrados, recuperados, contratado e IVH por programa de crédito.")
     public List<IvhItemDto> ivh(
-            // TODO: substituir por JWT context
-            @QueryParam("cdAgtFnco") int cdAgtFnco,
             @QueryParam("cdFundo")   @DefaultValue("-1") int cdFundo) {
+        int cdAgtFnco = contexto.getCdAgtFnco();
         LOG.debugf("[PAINEL-RES] ivh agente=%d fundo=%d", cdAgtFnco, cdFundo);
         return painelService.buscarIvh(cdAgtFnco, cdFundo);
     }
@@ -101,12 +106,12 @@ public class PainelResource {
 
     @GET
     @Path("/ivh/serie-historica")
+    @Funcionalidade("PAINEL_IVH_SERIE")
     @Operation(summary = "Série histórica do IVH",
             description = "Retorna a evolução mensal do IVH no formato [{periodo:'yyyy-MM', ivh:3.21}].")
     public IvhSerieDto ivhSerieHistorica(
-            // TODO: substituir por JWT context
-            @QueryParam("cdAgtFnco") int cdAgtFnco,
             @QueryParam("cdFundo")   @DefaultValue("-1") int cdFundo) {
+        int cdAgtFnco = contexto.getCdAgtFnco();
         LOG.debugf("[PAINEL-RES] ivhSerieHistorica agente=%d fundo=%d", cdAgtFnco, cdFundo);
         return painelService.buscarIvhSerieHistorica(cdAgtFnco, cdFundo);
     }
@@ -117,12 +122,12 @@ public class PainelResource {
 
     @GET
     @Path("/remessas/resumo")
+    @Funcionalidade("PAINEL_REMESSAS_RESUMO")
     @Operation(summary = "Resumo de remessas",
             description = "Retorna total esperadas, não movimentadas e concluídas.")
     public RemessasResumoDto remessasResumo(
-            // TODO: substituir por JWT context
-            @QueryParam("cdAgtFnco") int cdAgtFnco,
             @QueryParam("cdFundo")   @DefaultValue("-1") int cdFundo) {
+        int cdAgtFnco = contexto.getCdAgtFnco();
         LOG.debugf("[PAINEL-RES] remessasResumo agente=%d fundo=%d", cdAgtFnco, cdFundo);
         return painelService.buscarRemessasResumo(cdAgtFnco, cdFundo);
     }
@@ -133,12 +138,12 @@ public class PainelResource {
 
     @GET
     @Path("/pendencias/resumo")
+    @Funcionalidade("PAINEL_PENDENCIAS_RESUMO")
     @Operation(summary = "Resumo de pendências",
             description = "Retorna grupos de pendências com tipo, label e valor agregado.")
     public PendenciasResumoDto pendenciasResumo(
-            // TODO: substituir por JWT context
-            @QueryParam("cdAgtFnco") int cdAgtFnco,
             @QueryParam("cdFundo")   @DefaultValue("-1") int cdFundo) {
+        int cdAgtFnco = contexto.getCdAgtFnco();
         LOG.debugf("[PAINEL-RES] pendenciasResumo agente=%d fundo=%d", cdAgtFnco, cdFundo);
         return painelService.buscarPendenciasResumo(cdAgtFnco, cdFundo);
     }
@@ -149,12 +154,12 @@ public class PainelResource {
 
     @GET
     @Path("/movimentacao-financeira/serie-historica")
+    @Funcionalidade("PAINEL_MOVIMENTACAO_SERIE")
     @Operation(summary = "Série histórica de movimentação financeira",
             description = "Retorna evolução mensal da carteira do agente e do fundo.")
     public MovimentacaoSerieDto movimentacaoSerieHistorica(
-            // TODO: substituir por JWT context
-            @QueryParam("cdAgtFnco") int cdAgtFnco,
             @QueryParam("cdFundo")   @DefaultValue("-1") int cdFundo) {
+        int cdAgtFnco = contexto.getCdAgtFnco();
         LOG.debugf("[PAINEL-RES] movimentacaoSerieHistorica agente=%d fundo=%d", cdAgtFnco, cdFundo);
         return painelService.buscarMovimentacaoSerie(cdAgtFnco, cdFundo);
     }

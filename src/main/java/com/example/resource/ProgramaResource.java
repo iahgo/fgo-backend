@@ -1,6 +1,8 @@
 package com.example.resource;
 
 import com.example.dto.painel.ProgramaDto;
+import com.example.security.ContextoSeguranca;
+import com.example.security.Funcionalidade;
 import com.example.service.PainelService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.DefaultValue;
@@ -20,7 +22,7 @@ import java.util.List;
  *
  * GET /api/v1/programas — endpoint 2
  *
- * TODO: substituir @QueryParam("cdAgtFnco") por contexto JWT quando a autenticação for implementada.
+ * O cdAgtFnco é extraído do contexto JWT (ContextoSeguranca) — não é passado como parâmetro.
  */
 @Path("/api/v1/programas")
 @Produces(MediaType.APPLICATION_JSON)
@@ -32,21 +34,22 @@ public class ProgramaResource {
     @Inject
     PainelService painelService;
 
+    @Inject
+    ContextoSeguranca contexto;
+
     /**
      * Lista os programas de crédito nos quais o agente possui operações.
      *
-     * @param cdAgtFnco código do agente financeiro (obrigatório)
-     *                  TODO: substituir por JWT context
      * @param cdFundo   filtro opcional por fundo (-1 = todos os fundos)
      */
     @GET
+    @Funcionalidade("PROGRAMAS_LISTA")
     @Operation(summary = "Lista programas do agente",
             description = "Retorna os programas de crédito nos quais o agente possui operações, "
                     + "opcionalmente filtrado por fundo garantidor.")
     public List<ProgramaDto> listar(
-            // TODO: substituir por JWT context
-            @QueryParam("cdAgtFnco") int cdAgtFnco,
             @QueryParam("cdFundo")   @DefaultValue("-1") int cdFundo) {
+        int cdAgtFnco = contexto.getCdAgtFnco();
         LOG.debugf("[PROGRAMA-RES] listar agente=%d fundo=%d", cdAgtFnco, cdFundo);
         return painelService.listarProgramas(cdAgtFnco, cdFundo);
     }

@@ -41,15 +41,15 @@ public class OperacaoListagemRepository {
      * Lista operações paginadas com filtros opcionais.
      *
      * Colunas retornadas (índices do Object[]):
-     *   [0]  D.NM_FNDO_GRTR (ou SG)   nmFundo
-     *   [1]  CASE NM_ABVO_TIP_PGM     nmPrograma (com Pronampe Solidário)
-     *   [2]  A.CD_IDFR_EXNO_OPR       nrOperacao (referência externa do contrato)
-     *   [3]  A.NM_TIP_PBCO_ALVO       publicoAlvo
-     *   [4]  A.NM_TIP_EST_OPR         estadoOperacao
-     *   [5]  A.DT_FRMZ_OPR            dataFormal
-     *   [6]  A.DT_VNCT_OPR            dataVencimento
-     *   [7]  A.VL_OPR_CRD             valorOperacao
-     *   [8]  A.VL_TTL_LIBD_OPR        valorLiberado
+     *   [0]  D.NM_FNDO_GRTR             nmFundo
+     *   [1]  CASE NM_ABVO_TIP_PGM       nmPrograma (com Pronampe Solidário)
+     *   [2]  A.CD_IDFR_EXNO_OPR         nrOperacao (referência externa do contrato)
+     *   [3]  A.NM_TIP_PBCO_ALVO         publicoAlvo
+     *   [4]  A.NM_TIP_EST_OPR           estadoOperacao
+     *   [5]  A.DT_FRMZ_OPR              dataFormal
+     *   [6]  A.DT_VNCT_OPR              dataVencimento
+     *   [7]  A.VL_OPR_CRD               valorOperacao
+     *   [8]  A.VL_TTL_LIBD_OPR          valorLiberado
      */
     @Transactional(Transactional.TxType.REQUIRED)
     @SuppressWarnings("unchecked")

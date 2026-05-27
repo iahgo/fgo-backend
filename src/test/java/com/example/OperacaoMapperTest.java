@@ -33,12 +33,12 @@ class OperacaoMapperTest {
 
         OperacaoKpiDto dto = mapper.toKpiDto(agregado);
 
-        assertEquals("FGO Geral", dto.getPrograma());
-        assertEquals(150L, dto.getTotalAtivas());
-        assertEquals(new BigDecimal("5000000.00"), dto.getVlrCarteira());
-        assertEquals(10L, dto.getTotalInad());
-        assertEquals(new BigDecimal("250000.00"), dto.getVlrAtraso());
-        assertEquals(new BigDecimal("4000000.00"), dto.getVlrGarantia());
+        assertEquals("FGO Geral", dto.getNomePrograma());
+        assertEquals(150L, dto.getQuantidadeAtivas());
+        assertEquals(new BigDecimal("5000000.00"), dto.getSaldoCarteira());
+        assertEquals(10L, dto.getQuantidadeInadimplentes());
+        assertEquals(new BigDecimal("250000.00"), dto.getSaldoAtraso());
+        assertEquals(new BigDecimal("4000000.00"), dto.getValorGarantia());
     }
 
     @Test
@@ -54,8 +54,8 @@ class OperacaoMapperTest {
 
         OperacaoKpiDto dto = mapper.toKpiDto(agregado);
 
-        // taxaInad = 20 / 200 = 0.1
-        assertEquals(0.1, dto.getTaxaInad(), 0.000001);
+        // taxaInadimplencia = 20 / 200 = 0.1
+        assertEquals(0.1, dto.getTaxaInadimplencia(), 0.000001);
     }
 
     @Test
@@ -71,9 +71,9 @@ class OperacaoMapperTest {
 
         OperacaoKpiDto dto = mapper.toKpiDto(agregado);
 
-        assertEquals(0L, dto.getTotalAtivas());
-        assertEquals(BigDecimal.ZERO, dto.getVlrCarteira());
-        assertEquals(0.0, dto.getTaxaInad(), 0.000001);
+        assertEquals(0L, dto.getQuantidadeAtivas());
+        assertEquals(BigDecimal.ZERO, dto.getSaldoCarteira());
+        assertEquals(0.0, dto.getTaxaInadimplencia(), 0.000001);
     }
 
     @Test
@@ -89,9 +89,9 @@ class OperacaoMapperTest {
 
         OperacaoKpiDto dto = mapper.toKpiDto(agregado);
 
-        assertNull(dto.getPrograma());
-        assertEquals(5L, dto.getTotalAtivas());
-        assertEquals(new BigDecimal("80.00"), dto.getVlrGarantia());
+        assertNull(dto.getNomePrograma());
+        assertEquals(5L, dto.getQuantidadeAtivas());
+        assertEquals(new BigDecimal("80.00"), dto.getValorGarantia());
     }
 
     @Test
@@ -109,7 +109,7 @@ class OperacaoMapperTest {
         OperacaoKpiDto dto = mapper.toKpiDto(agregado);
 
         // Deve arredondar para 6 casas decimais
-        assertEquals(0.333333, dto.getTaxaInad(), 0.000001);
+        assertEquals(0.333333, dto.getTaxaInadimplencia(), 0.000001);
     }
 
     @Test
@@ -125,8 +125,8 @@ class OperacaoMapperTest {
 
         OperacaoKpiDto dto = mapper.toKpiDto(agregado);
 
-        assertEquals(1.0, dto.getTaxaInad(), 0.000001);
-        assertEquals(50L, dto.getTotalInad());
+        assertEquals(1.0, dto.getTaxaInadimplencia(), 0.000001);
+        assertEquals(50L, dto.getQuantidadeInadimplentes());
     }
 
     // -----------------------------------------------------------------------
@@ -142,19 +142,18 @@ class OperacaoMapperTest {
                 new BigDecimal("100000.00"), new BigDecimal("1600000.00"))
         );
 
-        var resumo = mapper.toResumoDto(8, "2026-04", dados);
+        var resumo = mapper.toResumoDto(8, dados);
 
-        assertEquals(8, resumo.getCodAgente());
-        assertEquals("2026-04", resumo.getMesAno());
+        assertEquals(8, resumo.getCodigoAgente());
         assertEquals(2, resumo.getProgramas().size());
         assertNotNull(resumo.getCarregadoEm());
     }
 
     @Test
     void toResumoDtoComListaVaziaDeveRetornarSemProgramas() {
-        var resumo = mapper.toResumoDto(3, "2026-04", java.util.List.of());
+        var resumo = mapper.toResumoDto(3, java.util.List.<OperacaoAgregada>of());
 
-        assertEquals(3, resumo.getCodAgente());
+        assertEquals(3, resumo.getCodigoAgente());
         assertTrue(resumo.getProgramas().isEmpty());
     }
 }
