@@ -38,17 +38,19 @@
         </dependency>
 
         <!--
-            Hibernate ORM — JPA com EntityManager + JPQL.
-            Usa o datasource DB2 configurado em application.properties.
+            Agroal — pool de conexões JDBC (DataSource).
+            Expõe AgroalDataSource para injeção nos repositórios.
+            quarkus-jdbc-db2 já traz agroal transitivamente em runtime,
+            mas a dependência explícita garante o compile scope.
         -->
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-hibernate-orm</artifactId>
+            <artifactId>quarkus-agroal</artifactId>
         </dependency>
 
         <!--
             DB2 JDBC — driver IBM JCC (IBM publicou em Maven Central em 2021).
-            Provê o datasource que o Hibernate ORM usa.
+            Provê o datasource que o Agroal gerencia.
             Connection string: jdbc:db2://HOST:50000/BANCO
         -->
         <dependency>
