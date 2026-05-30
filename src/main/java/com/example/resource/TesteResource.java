@@ -20,7 +20,7 @@ public class TesteResource {
 
     private static final Logger LOG = Logger.getLogger(TesteResource.class);
     private static final String POD = System.getenv("HOSTNAME") != null ? System.getenv("HOSTNAME") : "local";
-    private static final List<Integer> AGENTES_TESTE = List.of(1, 2, 3);
+    private static final List<Integer> AGENTES_TESTE = List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
 
     @Inject OperacaoRedisRepository redisRepository;
 
