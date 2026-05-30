@@ -15,6 +15,7 @@ import java.util.Optional;
 public class OperacaoRedisRepository {
 
     private static final Logger LOG = Logger.getLogger(OperacaoRedisRepository.class);
+    private static final String POD = System.getenv("HOSTNAME") != null ? System.getenv("HOSTNAME") : "local";
     private static final String PADRAO_CHAVE_DADOS = "af:%d:operacao:resumo";
     private static final String PADRAO_CHAVE_LOCK  = "lock:operacao:%d";
 
@@ -64,15 +65,21 @@ public class OperacaoRedisRepository {
 
     public boolean adquirirLock(int codAgente) {
         String chave = chaveLock(codAgente);
-        boolean adquirido = redis.value(String.class).setnx(chave, "locked");
+        boolean adquirido = redis.value(String.class).setnx(chave, POD);
         if (adquirido) {
             redis.key(String.class).expire(chave, config.cache().ttlLock());
+            LOG.infof("[REDIS-LOCK] pod=%s | agente=%d | SETNX OK — lock adquirido | chave=%s", POD, codAgente, chave);
+        } else {
+            String donoPod = redis.value(String.class).get(chave);
+            LOG.infof("[REDIS-LOCK] pod=%s | agente=%d | SETNX NEGADO — lock pertence ao pod=%s | chave=%s", POD, codAgente, donoPod, chave);
         }
         return adquirido;
     }
 
     public void liberarLock(int codAgente) {
-        redis.key(String.class).del(chaveLock(codAgente));
+        String chave = chaveLock(codAgente);
+        redis.key(String.class).del(chave);
+        LOG.infof("[REDIS-LOCK] pod=%s | agente=%d | lock DEL | chave=%s", POD, codAgente, chave);
     }
 
     private String chaveResumo(int codAgente) { return String.format(PADRAO_CHAVE_DADOS, codAgente); }

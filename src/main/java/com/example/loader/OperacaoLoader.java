@@ -20,6 +20,7 @@ import java.util.List;
 public class OperacaoLoader {
 
     private static final Logger LOG = Logger.getLogger(OperacaoLoader.class);
+    private static final String POD = System.getenv("HOSTNAME") != null ? System.getenv("HOSTNAME") : "local";
 
     @Inject OperacaoRepository db2Repository;
     @Inject OperacaoRedisRepository redisRepository;
@@ -28,17 +29,17 @@ public class OperacaoLoader {
 
     @Scheduled(cron = "0 20 7 * * ?")
     public void warmUpDiario() {
-        LOG.info("=== [WARM-UP] Iniciando carga diaria DB2 -> Redis ===");
+        LOG.infof("=== [WARM-UP] pod=%s | Iniciando carga diaria DB2 -> Redis ===", POD);
         carregarTodosComRetry("warm-up-diario");
     }
 
     void onStart(@Observes StartupEvent event) {
-        LOG.info("=== [STARTUP] Disparando warm-up em background ===");
+        LOG.infof("=== [STARTUP] pod=%s | Disparando warm-up em background ===", POD);
         executor.submit(() -> {
             try {
                 carregarTodosComRetry("startup-bg");
             } catch (Exception e) {
-                LOG.errorf("[STARTUP] Erro no warm-up: %s", e.getMessage());
+                LOG.errorf("[STARTUP] pod=%s | Erro no warm-up: %s", POD, e.getMessage());
             }
         });
     }
@@ -49,21 +50,21 @@ public class OperacaoLoader {
         if (agentes.isEmpty()) return;
         int agentePiloto = agentes.get(0);
         if (redisRepository.existe(agentePiloto)) return;
-        LOG.warnf("[GUARDIAN] Cache ausente para agente=%d — disparando warm-up.", agentePiloto);
+        LOG.warnf("[GUARDIAN] pod=%s | Cache ausente para agente=%d — disparando warm-up.", POD, agentePiloto);
         carregarTodosComRetry("guardian");
     }
 
     public void recarregarTudo() {
-        LOG.info("[RELOAD] Recarga manual — todos os agentes.");
+        LOG.infof("[RELOAD] pod=%s | Recarga manual — todos os agentes.", POD);
         carregarTodosComRetry("reload-manual");
     }
 
     public void recarregarAgente(int codAgente) {
-        LOG.infof("[RELOAD] Recarga manual — agente=%d", codAgente);
+        LOG.infof("[RELOAD] pod=%s | Recarga manual — agente=%d", POD, codAgente);
         try {
             carregarAgente(codAgente);
         } catch (Exception e) {
-            LOG.errorf("[RELOAD] Falha ao recarregar agente=%d: %s", codAgente, e.getMessage());
+            LOG.errorf("[RELOAD] pod=%s | Falha ao recarregar agente=%d: %s", POD, codAgente, e.getMessage());
             throw e;
         }
     }
@@ -71,7 +72,7 @@ public class OperacaoLoader {
     private void carregarTodosComRetry(String origem) {
         List<Integer> agentes = agentesAtivos();
         if (agentes.isEmpty()) {
-            LOG.warnf("[%s] Nenhum agente ativo — nada a carregar.", origem);
+            LOG.warnf("[%s] pod=%s | Nenhum agente ativo — nada a carregar.", origem, POD);
             return;
         }
 
@@ -82,7 +83,7 @@ public class OperacaoLoader {
             try {
                 carregarAgente(codAgente);
             } catch (Exception e) {
-                LOG.errorf("[%s] FALHA P1 | agente=%d | %s", origem, codAgente, e.getMessage());
+                LOG.errorf("[%s] pod=%s | FALHA P1 | agente=%d | %s", origem, POD, codAgente, e.getMessage());
                 falhas.add(codAgente);
             }
         }
@@ -91,30 +92,34 @@ public class OperacaoLoader {
         for (int codAgente : falhas) {
             try {
                 carregarAgente(codAgente);
-                LOG.infof("[%s] RECUPERADO na P2 | agente=%d", origem, codAgente);
+                LOG.infof("[%s] pod=%s | RECUPERADO na P2 | agente=%d", origem, POD, codAgente);
             } catch (Exception e) {
-                LOG.errorf("[%s] FALHA P2 | agente=%d | %s", origem, codAgente, e.getMessage());
+                LOG.errorf("[%s] pod=%s | FALHA P2 | agente=%d | %s", origem, POD, codAgente, e.getMessage());
                 falhasFinais.add(codAgente);
             }
         }
 
         long ms = System.currentTimeMillis() - inicio;
-        LOG.infof("[%s] Concluido em %dms | %d/%d agentes", origem, ms,
+        LOG.infof("[%s] pod=%s | Concluido em %dms | %d/%d agentes", origem, POD, ms,
                 agentes.size() - falhasFinais.size(), agentes.size());
     }
 
     private void carregarAgente(int codAgente) {
         if (!redisRepository.adquirirLock(codAgente)) {
-            LOG.debugf("[LOADER] agente=%d lock ocupado, pulando.", codAgente);
+            LOG.infof("[LOADER] pod=%s | agente=%d | LOCK OCUPADO — outro pod esta carregando, pulando.", POD, codAgente);
             return;
         }
         try {
+            LOG.infof("[LOADER] pod=%s | agente=%d | LOCK ADQUIRIDO — iniciando carga do DB2...", POD, codAgente);
+            long inicio = System.currentTimeMillis();
             List<OperacaoAgregada> dados = db2Repository.buscarAgregadoPorAgente(codAgente);
             OperacaoResumoDto dto = mapper.toResumoDto(codAgente, dados);
             redisRepository.salvar(dto);
-            LOG.debugf("[LOADER] agente=%d | %d programa(s) -> Redis", codAgente, dados.size());
+            LOG.infof("[LOADER] pod=%s | agente=%d | %d programa(s) gravados no Redis em %dms",
+                    POD, codAgente, dados.size(), System.currentTimeMillis() - inicio);
         } finally {
             redisRepository.liberarLock(codAgente);
+            LOG.infof("[LOADER] pod=%s | agente=%d | lock liberado.", POD, codAgente);
         }
     }
 
