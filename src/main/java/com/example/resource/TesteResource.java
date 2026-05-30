@@ -11,7 +11,7 @@ import org.jboss.logging.Logger;
 
 import java.util.Map;
 
-@Path("/api/admin/teste")
+@Path("/admin/teste")
 @Produces(MediaType.APPLICATION_JSON)
 @Tag(name = "Teste", description = "Endpoints de teste — remover antes de ir para producao")
 public class TesteResource {
